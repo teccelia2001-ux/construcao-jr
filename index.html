@@ -16,11 +16,16 @@
       <div class="logo">JR</div>
       <div>
         <h1 id="empresaNome">Construtora JR</h1>
-        <small id="hojeLabel"></small>
+        <small id="hojeLabel"></small> <span class="ver" id="verLabel" data-act="goTab" data-tab="config"></span>
       </div>
     </div>
     <button class="icon-btn" data-act="goTab" data-tab="config" title="Configurações">⚙️</button>
   </header>
+
+  <div class="update-bar" id="updateBar" hidden>
+    <span>🚀 Nova versão <b id="novaVer"></b> disponível</span>
+    <button class="btn sm" data-act="atualizarApp">Atualizar agora</button>
+  </div>
 
   <nav class="tabs" id="tabs">
     <button data-act="goTab" data-tab="agenda">📅<span>Agenda</span></button>

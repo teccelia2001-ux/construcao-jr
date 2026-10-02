@@ -3,6 +3,8 @@
 
 // ---------- Dados ----------
 const KEY = 'construtora-jr-v1';
+// Versão do app — ao publicar mudanças, aumente aqui E no arquivo version.json
+const APP_VERSION = '1.1.0';
 
 const CATALOGO_PADRAO = [
   ['material', 'Tijolo 8 furos', 'milheiro', 900],
@@ -1135,9 +1137,25 @@ VIEWS.config = () => `
       <label class="btn sec" style="margin:0">⬆️ Restaurar backup<input type="file" accept="application/json,.json" id="importFile" hidden></label>
     </div>
   </div>
+  <div class="section-head"><h2>Acesso pelo celular</h2></div>
+  <div class="card">
+    <div class="link-box"><input readonly value="${esc(location.href.split('#')[0].split('?')[0])}" id="linkApp"><button class="btn sec" data-act="copiarLink">Copiar</button></div>
+    <p class="muted" style="font-size:13px;margin-bottom:0">Abra este link no celular e use <b>⋮ → Adicionar à tela inicial</b> (Android) ou <b>Compartilhar → Adicionar à Tela de Início</b> (iPhone) para instalar como app.</p>
+  </div>
+
+  <div class="section-head"><h2>Versão do app</h2></div>
+  <div class="card">
+    <div class="list-item"><div class="info"><div class="title">Versão instalada</div><div class="sub" id="cfgVerInfo">Verificando atualizações…</div></div><b>v${APP_VERSION}</b></div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn sec" data-act="verificarAtualizacao">🔄 Verificar atualização</button>
+      <button class="btn" data-act="atualizarApp">⬆️ Atualizar para nova versão</button>
+    </div>
+  </div>
+
   <div class="row"><button class="btn danger" data-act="zerar">Apagar todos os dados</button></div>`;
 
 POS.config = () => {
+  verificarVersao();
   document.getElementById('cfgForm').addEventListener('submit', e => {
     e.preventDefault();
     Object.assign(db.config, Object.fromEntries(new FormData(e.target).entries()));
@@ -1167,4 +1185,60 @@ actions.zerar = () => {
   db = estadoInicial(); salvar(); render(); toast('Dados apagados');
 };
 
+// =====================================================
+// VERSÃO E ATUALIZAÇÃO
+// =====================================================
+let versaoRemota = null;
+
+function cmpVersao(a, b) {
+  const pa = String(a).split('.').map(Number), pb = String(b).split('.').map(Number);
+  for (let i = 0; i < 3; i++) { if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) - (pb[i] || 0); }
+  return 0;
+}
+
+async function verificarVersao(avisar = false) {
+  const info = document.getElementById('cfgVerInfo');
+  if (location.protocol === 'file:') { if (info) info.textContent = 'Abra pelo link do site para receber atualizações.'; return; }
+  try {
+    const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+    versaoRemota = await r.json();
+    const nova = cmpVersao(versaoRemota.version, APP_VERSION) > 0;
+    document.getElementById('updateBar').hidden = !nova;
+    document.getElementById('novaVer').textContent = 'v' + versaoRemota.version;
+    if (info) info.textContent = nova ? `Nova versão v${versaoRemota.version} disponível${versaoRemota.notas ? ' — ' + versaoRemota.notas : ''}` : 'Você está usando a versão mais recente.';
+    if (avisar) toast(nova ? 'Nova versão disponível!' : 'O app já está atualizado');
+  } catch (e) {
+    if (info) info.textContent = 'Sem conexão para verificar atualizações.';
+    if (avisar) toast('Sem internet para verificar');
+  }
+}
+
+actions.verificarAtualizacao = () => verificarVersao(true);
+actions.atualizarApp = async () => {
+  toast('Atualizando…');
+  try {
+    if ('caches' in window) { for (const k of await caches.keys()) await caches.delete(k); }
+    if (navigator.serviceWorker) {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg) await reg.update();
+    }
+  } catch (e) { /* segue para recarregar */ }
+  location.replace(location.pathname + '?v=' + Date.now() + location.hash);
+};
+actions.copiarLink = async () => {
+  const v = document.getElementById('linkApp').value;
+  try { await navigator.clipboard.writeText(v); toast('Link copiado'); }
+  catch (e) { document.getElementById('linkApp').select(); toast('Selecione e copie o link'); }
+};
+
+document.getElementById('verLabel').textContent = 'v' + APP_VERSION;
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+// remove o ?v= da barra de endereço depois de atualizar
+if (location.search.includes('v=')) history.replaceState(null, '', location.pathname + location.hash);
+
 render();
+verificarVersao();
+setInterval(verificarVersao, 30 * 60 * 1000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) verificarVersao(); });
