@@ -4,7 +4,7 @@
 // ---------- Dados ----------
 const KEY = 'construtora-jr-v1';
 // Versão do app — ao publicar mudanças, aumente aqui, no version.json e nos ?v= do index.html
-const APP_VERSION = '1.5.1';
+const APP_VERSION = '1.6.0';
 
 const CATALOGO_PADRAO = [
   ['material', 'Tijolo 8 furos', 'milheiro', 900],
@@ -886,7 +886,7 @@ VIEWS.funcionarios = () => {
   </table>` : '<div class="empty">Cadastre os funcionários para gerar o relatório</div>'}</div>
 
   <div class="card row">
-    <div class="info" style="flex:1">👷 Cadastro, edição e faltas dos funcionários ficam na aba <b>Funcionários</b>.${faltasPeriodo.length ? ` <span class="muted">(${faltasPeriodo.length} falta(s) neste período)</span>` : ''}</div>
+    <div class="info" style="flex:1 1 220px">👷 Cadastro, edição e faltas dos funcionários ficam na aba <b>Funcionários</b>.${faltasPeriodo.length ? ` <span class="muted">(${faltasPeriodo.length} falta(s) neste período)</span>` : ''}</div>
     <button class="btn sec" data-act="goTab" data-tab="equipe">Abrir Funcionários</button>
   </div>`;
 };
@@ -1351,7 +1351,9 @@ VIEWS.config = () => `
   <div class="section-head"><h2>Acesso pelo celular</h2></div>
   <div class="card">
     <div class="link-box"><input readonly value="${esc(location.href.split('#')[0].split('?')[0])}" id="linkApp"><button class="btn sec" data-act="copiarLink">Copiar</button></div>
-    <p class="muted" style="font-size:13px;margin-bottom:0">Abra este link no celular e use <b>⋮ → Adicionar à tela inicial</b> (Android) ou <b>Compartilhar → Adicionar à Tela de Início</b> (iPhone) para instalar como app.</p>
+    ${modoApp() ? '<p style="margin-bottom:0">✅ Você está usando como <b>aplicativo</b>, sem a barra do navegador.</p>'
+      : `<p class="muted" style="font-size:13px">Instale na tela inicial para abrir como aplicativo, em tela cheia e sem a barra do navegador.</p>
+         <button class="btn" data-act="instalarApp">📲 Instalar como aplicativo</button>`}
   </div>
 
   <div class="section-head"><h2>Versão do app</h2></div>
@@ -1464,6 +1466,74 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
 }
 // remove o ?v= da barra de endereço depois de atualizar
 if (/[?&]v=/.test(location.search)) history.replaceState(null, '', location.pathname + location.hash);
+
+// =====================================================
+// INSTALAR COMO APLICATIVO (tela cheia, sem barra do navegador)
+// =====================================================
+const modoApp = () => matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: minimal-ui)').matches || navigator.standalone === true;
+const ehIOS = () => /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+const navInterno = () => /FBAN|FBAV|Instagram|Line\/|WhatsApp/i.test(navigator.userAgent); // navegadores dentro de outros apps
+let pedidoInstalar = null;
+
+function mostrarInstalar() {
+  if (modoApp()) return;
+  document.getElementById('btnInstalar').hidden = false;
+  let fechado = 0;
+  try { fechado = Number(localStorage.getItem(KEY + ':instalarFechado') || 0); } catch (e) { /* ignora */ }
+  if (Date.now() - fechado < 3 * 864e5) return; // dispensado há menos de 3 dias
+  if (ehIOS()) document.getElementById('installMsg').innerHTML = 'Toque em <b>Compartilhar ⬆️</b> e depois em <b>Adicionar à Tela de Início</b>.';
+  document.getElementById('installBar').hidden = false;
+  ajustarTopo();
+}
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); pedidoInstalar = e; mostrarInstalar(); });
+window.addEventListener('appinstalled', () => {
+  pedidoInstalar = null;
+  document.getElementById('installBar').hidden = true; document.getElementById('btnInstalar').hidden = true;
+  toast('App instalado! Abra pelo ícone JR Construções na tela inicial.');
+});
+// celulares: mostra a dica mesmo se o navegador não avisar (iPhone nunca avisa)
+if ((ehIOS() || /Android/i.test(navigator.userAgent)) && !modoApp()) setTimeout(mostrarInstalar, 2500);
+
+actions.fecharInstalar = () => {
+  document.getElementById('installBar').hidden = true;
+  try { localStorage.setItem(KEY + ':instalarFechado', String(Date.now())); } catch (e) { /* ignora */ }
+  ajustarTopo();
+};
+actions.instalarApp = async () => {
+  if (pedidoInstalar) {
+    pedidoInstalar.prompt();
+    const r = await pedidoInstalar.userChoice.catch(() => ({}));
+    if (r.outcome === 'accepted') toast('Instalando…');
+    pedidoInstalar = null;
+    return;
+  }
+  const link = location.href.split('#')[0].split('?')[0];
+  let passos;
+  if (navInterno()) {
+    passos = `<p>Você abriu o link dentro de outro aplicativo (WhatsApp, Instagram…), que não permite instalar.</p>
+      <ol class="passos"><li>Toque nos <span class="kbd">⋮</span> ou <span class="kbd">…</span> no canto da tela.</li>
+      <li>Escolha <b>Abrir no navegador</b> (Chrome ou Safari).</li><li>Lá, toque em <b>Instalar app</b>.</li></ol>`;
+  } else if (ehIOS()) {
+    passos = `<ol class="passos"><li>Abra o link no <b>Safari</b>.</li>
+      <li>Toque no botão <b>Compartilhar</b> <span class="kbd">⬆️</span> (embaixo da tela).</li>
+      <li>Role e toque em <b>Adicionar à Tela de Início</b>.</li>
+      <li>Toque em <b>Adicionar</b>. O ícone da JR Construções aparece na tela inicial.</li></ol>`;
+  } else if (/Android/i.test(navigator.userAgent)) {
+    passos = `<ol class="passos"><li>Abra o link no <b>Chrome</b>.</li>
+      <li>Toque nos <span class="kbd">⋮</span> (canto de cima).</li>
+      <li>Toque em <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.</li>
+      <li>Confirme. O ícone da JR Construções aparece na tela inicial.</li></ol>`;
+  } else {
+    passos = `<ol class="passos"><li>Use o <b>Google Chrome</b> ou o <b>Microsoft Edge</b>.</li>
+      <li>Clique no ícone de instalar <span class="kbd">⊕</span> no fim da barra de endereço, ou no menu <span class="kbd">⋮</span> → <b>Instalar JR Construções</b>.</li>
+      <li>O app abre em janela própria e ganha atalho na área de trabalho.</li></ol>`;
+  }
+  abrirModal('Instalar como aplicativo', `
+    <div class="row" style="margin:6px 0 10px"><img src="img/icon-192.png" alt="" style="width:56px;height:56px;border-radius:14px"><div><b>JR Construções</b><div class="sub muted">Abre em tela cheia, sem a barra do navegador</div></div></div>
+    ${passos}
+    <p class="muted" style="font-size:12.5px">Depois de instalado, abra sempre pelo ícone da tela inicial. Seus dados continuam os mesmos.</p>
+    <div class="link-box" style="margin-top:8px"><input readonly value="${esc(link)}" id="linkApp"><button type="button" class="btn sec" data-act="copiarLink">Copiar link</button></div>`, null);
+};
 
 const ajustarTopo = () => document.documentElement.style.setProperty('--topbar-h', document.querySelector('.topbar').offsetHeight + 'px');
 window.addEventListener('resize', ajustarTopo);

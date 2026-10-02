@@ -14,7 +14,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=1.5.1">
+  <link rel="stylesheet" href="styles.css?v=1.6.0">
 </head>
 <body>
   <div class="splash" id="splash"><img src="img/logo.jpg" alt="JR Construções — Sua obra em boas mãos"></div>
@@ -25,12 +25,20 @@
       <small id="hojeLabel"></small>
       <span class="ver" id="verLabel" data-act="goTab" data-tab="config"></span>
     </div>
+    <button class="btn sm install-btn" id="btnInstalar" data-act="instalarApp" hidden>📲 Instalar app</button>
     <button class="icon-btn" data-act="goTab" data-tab="config" title="Configurações">⚙️</button>
   </header>
 
   <div class="update-bar" id="updateBar" hidden>
     <span>🚀 Nova versão <b id="novaVer"></b> disponível</span>
     <button class="btn sm" data-act="atualizarApp">Atualizar agora</button>
+  </div>
+
+  <div class="install-bar" id="installBar" hidden>
+    <img src="img/icon-192.png" alt="">
+    <div class="install-txt"><b>Use como aplicativo</b><span id="installMsg">Instale o JR Construções na tela inicial e abra sem a barra do navegador.</span></div>
+    <button class="btn sm" data-act="instalarApp">Instalar</button>
+    <button class="icon-btn" data-act="fecharInstalar" title="Agora não">✕</button>
   </div>
 
   <nav class="tabs" id="tabs">
@@ -61,6 +69,6 @@
   <script src="vendor/chart.umd.min.js"></script>
   <script src="vendor/jspdf.umd.min.js"></script>
   <script src="vendor/jspdf.plugin.autotable.min.js"></script>
-  <script src="app.js?v=1.5.1"></script>
+  <script src="app.js?v=1.6.0"></script>
 </body>
 </html>

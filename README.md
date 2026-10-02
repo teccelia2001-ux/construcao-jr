@@ -19,7 +19,16 @@ App web (funciona no celular e no computador, inclusive offline) para a gestão 
 
 ## Como usar
 
-Abra o `index.html` no navegador ou publique pelo GitHub Pages. No celular, use **"Adicionar à tela inicial"** para ele virar um app.
+Link: **https://teccelia2001-ux.github.io/construcao-jr/**
+
+O app se adapta a qualquer tela: celular pequeno ou grande, em pé ou deitado, tablet, notebook e monitor grande.
+
+**Instalar como aplicativo (tela cheia, sem a barra do navegador):** ao abrir o link no celular, aparece a faixa **"Use como aplicativo"** com o botão **Instalar**. Ele também fica em ⚙️ → *Instalar como aplicativo*.
+- **Android (Chrome):** o botão instala direto ou mostra o caminho ⋮ → *Instalar app*.
+- **iPhone (Safari):** Compartilhar ⬆️ → *Adicionar à Tela de Início*.
+- **Computador (Chrome/Edge):** ícone de instalar na barra de endereço.
+
+Depois de instalado, abra sempre pelo ícone da tela inicial.
 
 **PDFs:** no celular, o botão de PDF abre o compartilhamento do sistema para enviar pelo WhatsApp. No computador, o PDF é baixado direto na pasta Downloads.
 

@@ -255,3 +255,79 @@ th { color: var(--muted); }
   .obra-pct { flex: 1 1 100%; }
   .obra-btns .mini-select { flex: 1; }
 }
+
+/* =====================================================
+   RESPONSIVO — celular, tablet, computador e telas grandes
+   ===================================================== */
+:root { --wrap: 1200px; --gutter: max(16px, calc((100vw - var(--wrap)) / 2)); }
+
+/* topo, abas e conteúdo alinhados na mesma largura */
+.topbar { padding-left: var(--gutter); padding-right: var(--gutter); padding-top: max(10px, env(safe-area-inset-top)); }
+.tabs { padding-left: var(--gutter); padding-right: var(--gutter); }
+main { max-width: calc(var(--wrap) + 32px); padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+.update-bar { padding-left: var(--gutter); padding-right: var(--gutter); }
+
+/* itens de grade nunca estouram a largura (gráficos, tabelas) */
+.grid > * { min-width: 0; }
+.chart-box canvas { max-width: 100%; }
+
+/* listas: quando falta espaço, valores e botões descem para a linha de baixo */
+.list-item { flex-wrap: wrap; row-gap: 8px; }
+.list-item .info { flex: 1 1 200px; }
+.list-item .amount { margin-left: auto; }
+
+/* tabelas: rolam de lado no celular sem quebrar palavra por palavra */
+.table-wrap { -webkit-overflow-scrolling: touch; }
+.table-wrap table { min-width: 560px; }
+td.num, th.num, tfoot td { white-space: nowrap; }
+
+/* telas largas: abas dividem a largura toda, sem precisar rolar (abaixo disso, rolam de lado) */
+@media (min-width: 900px) {
+  .tabs button { flex: 1 1 0; min-width: 0; }
+  .tabs button span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+}
+
+/* computador: mais espaço entre os blocos */
+@media (min-width: 1024px) {
+  main { padding-top: 22px; }
+  .card { padding: 18px; }
+  .stat .value { font-size: 24px; }
+  .chart-box { height: 300px; }
+}
+
+/* celular pequeno (até 360px) */
+@media (max-width: 360px) {
+  body { font-size: 14px; }
+  main { padding: 12px; }
+  .card { padding: 12px; }
+  .stat .value { font-size: 19px; }
+  .tabs button { min-width: 74px; padding: 7px 8px; }
+  .btn { padding: 9px 12px; }
+  .top-info small { display: none; }
+}
+
+/* celular deitado / telas baixas: topo não fica preso, sobra espaço para o conteúdo */
+@media (max-height: 500px) and (orientation: landscape) {
+  .topbar { position: static; }
+  .tabs { top: 0 !important; }
+  .logo { height: 54px; }
+  .modal { max-height: 96vh; }
+}
+
+/* Instalar como aplicativo */
+.install-btn { background: linear-gradient(180deg, #2f6df0, #1d4ed8); white-space: nowrap; }
+.install-bar {
+  display: flex; align-items: center; gap: 12px; padding: 10px var(--gutter);
+  background: linear-gradient(90deg, #0d2c55, #123a6e); border-bottom: 1px solid var(--border); color: #fff;
+}
+.install-bar[hidden] { display: none; }
+.install-bar img { width: 42px; height: 42px; border-radius: 10px; flex: 0 0 auto; }
+.install-txt { flex: 1; display: flex; flex-direction: column; font-size: 13px; line-height: 1.35; }
+.install-txt span { color: var(--silver); }
+.install-bar .icon-btn { width: 32px; height: 32px; font-size: 14px; }
+.passos { margin: 8px 0 0; padding-left: 20px; line-height: 1.7; }
+.passos li { margin-bottom: 6px; }
+.kbd { display: inline-block; padding: 1px 8px; border-radius: 8px; background: #132c52; border: 1px solid var(--border); font-weight: 600; }
+@media (max-width: 560px) { .install-btn { display: none; } }
+/* aberto como aplicativo (sem barra do navegador) */
+@media (display-mode: standalone) { .install-btn, .install-bar { display: none !important; } }
