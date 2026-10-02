@@ -4,7 +4,7 @@
 // ---------- Dados ----------
 const KEY = 'construtora-jr-v1';
 // Versão do app — ao publicar mudanças, aumente aqui E no arquivo version.json
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.1.1';
 
 const CATALOGO_PADRAO = [
   ['material', 'Tijolo 8 furos', 'milheiro', 900],
@@ -410,7 +410,7 @@ VIEWS.combustivel = () => {
     <div class="list-item">
       <span>⛽</span>
       <div class="info"><div class="title">${esc(byId('funcionarios', v.funcionarioId)?.nome || '—')}</div>
-        <div class="sub">${br(v.data)} · ${esc(byId('postos', v.postoId)?.nome || '—')}${v.placa ? ' · ' + esc(v.placa) : ''}${v.obs ? ' · ' + esc(v.obs) : ''}</div></div>
+        <div class="sub">${br(v.data)} · ${esc(byId('postos', v.postoId)?.nome || '—')}${v.obs ? ' · ' + esc(v.obs) : ''}</div></div>
       <div class="amount">${money(v.valor)}</div>
       <button class="btn ghost sm" data-act="pdfVale" data-id="${v.id}" title="Emitir vale">🧾</button>
       <button class="btn ghost sm" data-act="editVale" data-id="${v.id}">Editar</button>
@@ -457,7 +457,6 @@ function formVale(v = {}) {
       <div><label>Data *</label><input type="date" name="data" required value="${v.data || hoje()}"></div>
       <div><label>Valor liberado (R$) *</label><input name="valor" required inputmode="decimal" value="${v.valor ?? ''}"></div>
     </div>
-    <label>Veículo / placa</label><input name="placa" value="${esc(v.placa)}">
     <label>Observação</label><input name="obs" value="${esc(v.obs)}" placeholder="Ex.: ida à obra do Centro">`;
 }
 const okVale = () => db.funcionarios.length && db.postos.length;
@@ -1017,9 +1016,9 @@ actions.pdfVales = () => {
   const vales = db.vales.filter(v => entre(v.data, a, b)).sort((x, y) => x.data.localeCompare(y.data));
   const doc = novoPdf('VALES COMBUSTÍVEL');
   doc.setFontSize(10); doc.text(`Período: ${br(a)} a ${br(b)}`, 14, 40);
-  doc.autoTable({ startY: 45, head: [['Data', 'Colaborador', 'Posto', 'Veículo', 'Valor']], ...corTabela, columnStyles: { 4: { halign: 'right' } },
-    body: vales.map(v => [br(v.data), byId('funcionarios', v.funcionarioId)?.nome || '', byId('postos', v.postoId)?.nome || '', v.placa || '', money(v.valor)]),
-    foot: [[{ content: 'TOTAL', colSpan: 4 }, money(soma(vales))]], footStyles: { fillColor: [237, 233, 254], textColor: 30 } });
+  doc.autoTable({ startY: 45, head: [['Data', 'Colaborador', 'Posto', 'Valor']], ...corTabela, columnStyles: { 3: { halign: 'right' } },
+    body: vales.map(v => [br(v.data), byId('funcionarios', v.funcionarioId)?.nome || '', byId('postos', v.postoId)?.nome || '', money(v.valor)]),
+    foot: [[{ content: 'TOTAL', colSpan: 3 }, money(soma(vales))]], footStyles: { fillColor: [237, 233, 254], textColor: 30 } });
   rodapePdf(doc);
   compartilharPdf(doc, `Vales_${a}_a_${b}.pdf`, undefined, `Vales combustível ${br(a)} a ${br(b)}`);
 };
@@ -1028,7 +1027,7 @@ actions.pdfVale = ({ id }) => {
   const v = byId('vales', id), f = byId('funcionarios', v.funcionarioId) || {}, p = byId('postos', v.postoId) || {};
   const doc = novoPdf('VALE COMBUSTÍVEL');
   doc.setFontSize(12);
-  const linhas = [['Colaborador', f.nome || ''], ['Posto', p.nome || ''], ['Data', br(v.data)], ['Veículo / placa', v.placa || '—'], ['Valor liberado', money(v.valor)], ['Observação', v.obs || '—']];
+  const linhas = [['Colaborador', f.nome || ''], ['Posto', p.nome || ''], ['Data', br(v.data)], ['Valor liberado', money(v.valor)], ['Observação', v.obs || '—']];
   doc.autoTable({ startY: 42, body: linhas, theme: 'grid', styles: { fontSize: 12, cellPadding: 4 }, columnStyles: { 0: { fontStyle: 'bold', cellWidth: 55, fillColor: [237, 233, 254] } } });
   const y = doc.lastAutoTable.finalY + 30;
   doc.line(20, y, 95, y); doc.line(115, y, 190, y);
