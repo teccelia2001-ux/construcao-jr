@@ -4,7 +4,7 @@
 // ---------- Dados ----------
 const KEY = 'construtora-jr-v1';
 // Versão do app — ao publicar mudanças, aumente aqui E no arquivo version.json
-const APP_VERSION = '1.1.2';
+const APP_VERSION = '1.3.0';
 
 const CATALOGO_PADRAO = [
   ['material', 'Tijolo 8 furos', 'milheiro', 900],
@@ -400,7 +400,7 @@ VIEWS.combustivel = () => {
   return `
   ${filtroPeriodo(valeRef, 'valeRef')}
   <div class="grid grid-2" style="margin-top:12px">
-    <div class="stat hl"><div class="label">Total liberado (${br(a)} a ${br(b)})</div><div class="value">${money(soma(vales))}</div></div>
+    <div class="stat hl"><div class="label">Total adiantado em vales (${br(a)} a ${br(b)})</div><div class="value">${money(soma(vales))}</div></div>
     <div class="stat"><div class="label">Vales emitidos</div><div class="value">${vales.length}</div></div>
   </div>
 
@@ -425,7 +425,7 @@ VIEWS.combustivel = () => {
   <div class="card">${db.postos.length ? db.postos.map(p => `
     <div class="list-item"><div class="info"><div class="title">${esc(p.nome)}</div><div class="sub">${esc(p.endereco)} ${p.telefone ? '· ' + esc(p.telefone) : ''}</div></div>
     <button class="btn ghost sm" data-act="editPosto" data-id="${p.id}">Editar</button></div>`).join('') : '<div class="empty">Cadastre os postos conveniados</div>'}</div>
-  <p class="muted" style="font-size:13px">Os colaboradores são cadastrados na aba <b>Pagamentos</b>.</p>`;
+  <p class="muted" style="font-size:13px">Os vales são <b>adiantamento de salário</b>: são descontados automaticamente no relatório da aba Pagamentos. Os colaboradores são cadastrados na aba <b>Funcionários</b>.</p>`;
 };
 
 function rangePor(tipo, data) {
@@ -449,13 +449,13 @@ const changeActions = {};
 
 function formVale(v = {}) {
   if (!db.funcionarios.length || !db.postos.length) {
-    return `<div class="empty">Para emitir vales, cadastre ao menos ${!db.funcionarios.length ? 'um colaborador (aba Pagamentos)' : ''}${!db.funcionarios.length && !db.postos.length ? ' e ' : ''}${!db.postos.length ? 'um posto' : ''}.</div>`;
+    return `<div class="empty">Para emitir vales, cadastre ao menos ${!db.funcionarios.length ? 'um colaborador (aba Funcionários)' : ''}${!db.funcionarios.length && !db.postos.length ? ' e ' : ''}${!db.postos.length ? 'um posto' : ''}.</div>`;
   }
   return `<label>Colaborador *</label><select name="funcionarioId" required>${opt(db.funcionarios.filter(f => f.ativo !== false || f.id === v.funcionarioId), v.funcionarioId, 'Selecione…')}</select>
     <label>Posto *</label><select name="postoId" required>${opt(db.postos, v.postoId, 'Selecione…')}</select>
     <div class="grid grid-2">
       <div><label>Data *</label><input type="date" name="data" required value="${v.data || hoje()}"></div>
-      <div><label>Valor liberado (R$) *</label><input name="valor" required inputmode="decimal" value="${v.valor ?? ''}"></div>
+      <div><label>Valor do vale / adiantamento (R$) *</label><input name="valor" required inputmode="decimal" value="${v.valor ?? ''}"></div>
     </div>
     <label>Observação</label><input name="obs" value="${esc(v.obs)}" placeholder="Ex.: ida à obra do Centro">`;
 }
@@ -749,7 +749,7 @@ function enviarPdfOrc(o) {
 // 5) FUNCIONÁRIOS E PAGAMENTO
 // =====================================================
 const agora = new Date();
-let pag = { tipo: agora.getDate() <= 15 ? 'q1' : 'q2', mes: `${agora.getFullYear()}-${pad(agora.getMonth() + 1)}`, descontarVales: false };
+let pag = { tipo: agora.getDate() <= 15 ? 'q1' : 'q2', mes: `${agora.getFullYear()}-${pad(agora.getMonth() + 1)}` };
 
 function periodoPag() {
   const [y, m] = pag.mes.split('-').map(Number);
@@ -767,7 +767,9 @@ function diasUteis(a, b) {
   }
   return n;
 }
-function folha(a, b, descontarVales = false, ateHoje = false) {
+const pesoFalta = x => x.desconta === false ? 0 : (x.tipo === 'meia' ? 0.5 : 1);
+
+function folha(a, b, ateHoje = false) {
   if (ateHoje && b > hoje()) b = hoje();
   const uteis = diasUteis(a, b);
   return db.funcionarios.filter(f => f.ativo !== false).map(f => {
@@ -776,18 +778,18 @@ function folha(a, b, descontarVales = false, ateHoje = false) {
     const ini = adm > a ? adm : a;
     const dias = ini > b ? 0 : diasUteis(ini, b);
     const fs = db.faltas.filter(x => x.funcionarioId === f.id && entre(x.data, ini, b));
-    const faltas = fs.reduce((t, x) => t + (x.tipo === 'meia' ? 0.5 : 1), 0);
+    const faltas = fs.reduce((t, x) => t + pesoFalta(x), 0);
     const trab = Math.max(0, dias - faltas);
     const bruto = trab * num(f.diaria);
     const vales = soma(db.vales.filter(v => v.funcionarioId === f.id && entre(v.data, a, b)));
-    const desc = descontarVales ? vales : 0;
+    const desc = vales; // vale = adiantamento de salário, sempre descontado
     return { f, uteis, dias, faltas, trab, bruto, vales, desc, liquido: bruto - desc, listaFaltas: fs };
   });
 }
 
 VIEWS.funcionarios = () => {
   const [a, b] = periodoPag();
-  const linhas = folha(a, b, pag.descontarVales);
+  const linhas = folha(a, b);
   const total = linhas.reduce((t, l) => t + l.liquido, 0);
   const faltasPeriodo = db.faltas.filter(x => entre(x.data, a, b)).sort((x, y) => y.data.localeCompare(x.data));
   return `
@@ -800,7 +802,7 @@ VIEWS.funcionarios = () => {
       </div></div>
       <div><label>Mês</label><input type="month" value="${pag.mes}" data-change="pagMes"></div>
     </div>
-    <label class="check"><input type="checkbox" ${pag.descontarVales ? 'checked' : ''} data-change="pagVales"> Descontar vales combustível do pagamento</label>
+    <p class="muted" style="font-size:13px;margin:10px 0 0">⛽ Os vales são adiantamento de salário e já saem descontados do valor a pagar.</p>
     <label class="check"><input type="checkbox" ${db.config.trabalhaSabado ? 'checked' : ''} data-change="pagSabado"> Sábado conta como dia de trabalho</label>
   </div>
 
@@ -812,84 +814,225 @@ VIEWS.funcionarios = () => {
   <div class="section-head"><h2>Relatório de pagamento</h2>
     <div class="row"><button class="btn sec" data-act="lancarFalta">+ Lançar falta</button>${linhas.length ? '<button class="btn wa" data-act="pdfFolha">📄 Relatório PDF</button>' : ''}</div></div>
   <div class="card table-wrap">${linhas.length ? `<table>
-    <thead><tr><th>Funcionário</th><th class="num">Diária</th><th class="num">Dias</th><th class="num">Faltas</th><th class="num">Trab.</th>${pag.descontarVales ? '<th class="num">Vales</th>' : ''}<th class="num">A pagar</th></tr></thead>
+    <thead><tr><th>Funcionário</th><th class="num">Diária</th><th class="num">Dias</th><th class="num">Faltas</th><th class="num">Trab.</th><th class="num">Bruto</th><th class="num">Vales</th><th class="num">A pagar</th></tr></thead>
     <tbody>${linhas.map(l => `<tr><td><b>${esc(l.f.nome)}</b><br><small class="muted">${esc(l.f.funcao || '')}</small></td>
       <td class="num">${money(l.f.diaria)}</td><td class="num">${l.dias}</td><td class="num">${String(l.faltas).replace('.', ',')}</td><td class="num">${String(l.trab).replace('.', ',')}</td>
-      ${pag.descontarVales ? `<td class="num">-${money(l.desc)}</td>` : ''}<td class="num"><b>${money(l.liquido)}</b></td></tr>`).join('')}</tbody>
-    <tfoot><tr><td colspan="${pag.descontarVales ? 6 : 5}">Total</td><td class="num">${money(total)}</td></tr></tfoot>
+      <td class="num">${money(l.bruto)}</td><td class="num">${l.desc ? '-' + money(l.desc) : '—'}</td><td class="num"><b ${l.liquido < 0 ? 'style="color:var(--danger)"' : ''}>${money(l.liquido)}</b></td></tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="5">Total</td><td class="num">${money(linhas.reduce((t, l) => t + l.bruto, 0))}</td><td class="num">-${money(linhas.reduce((t, l) => t + l.desc, 0))}</td><td class="num">${money(total)}</td></tr></tfoot>
   </table>` : '<div class="empty">Cadastre os funcionários para gerar o relatório</div>'}</div>
 
-  <div class="section-head"><h2>Faltas no período (${faltasPeriodo.length})</h2></div>
-  <div class="card">${faltasPeriodo.length ? faltasPeriodo.map(x => `
-    <div class="list-item"><div class="info"><div class="title">${esc(byId('funcionarios', x.funcionarioId)?.nome || '—')}</div>
-      <div class="sub">${br(x.data)} · ${x.tipo === 'meia' ? 'Meio dia' : 'Dia inteiro'}${x.obs ? ' · ' + esc(x.obs) : ''}</div></div>
-      <button class="btn danger sm" data-act="delFalta" data-id="${x.id}">Remover</button></div>`).join('') : '<div class="empty">Nenhuma falta lançada</div>'}</div>
-
-  <div class="section-head"><h2>Funcionários (${db.funcionarios.length})</h2><button class="btn" data-act="novoFunc">+ Funcionário</button></div>
-  <div class="card">${db.funcionarios.length ? db.funcionarios.map(f => `
-    <div class="list-item" ${f.ativo === false ? 'style="opacity:.55"' : ''}>
-      <div class="info"><div class="title">${esc(f.nome)} ${f.ativo === false ? '<span class="badge gray">Inativo</span>' : ''}</div>
-        <div class="sub">${esc(f.funcao || '')} · Diária ${money(f.diaria)}${f.pix ? ' · PIX: ' + esc(f.pix) : ''}</div></div>
-      <button class="btn sec sm" data-act="lancarFalta" data-id="${f.id}">Falta</button>
-      <button class="btn ghost sm" data-act="editFunc" data-id="${f.id}">Editar</button>
-    </div>`).join('') : '<div class="empty">Nenhum funcionário cadastrado</div>'}</div>`;
+  <div class="card row">
+    <div class="info" style="flex:1">👷 Cadastro, edição e faltas dos funcionários ficam na aba <b>Funcionários</b>.${faltasPeriodo.length ? ` <span class="muted">(${faltasPeriodo.length} falta(s) neste período)</span>` : ''}</div>
+    <button class="btn sec" data-act="goTab" data-tab="equipe">Abrir Funcionários</button>
+  </div>`;
 };
 
 actions.pagTipo = d => { pag.tipo = d.t; render(); };
 changeActions.pagMes = el => { if (el.value) { pag.mes = el.value; render(); } };
-changeActions.pagVales = el => { pag.descontarVales = el.checked; render(); };
 changeActions.pagSabado = el => { db.config.trabalhaSabado = el.checked; salvar(); render(); };
 
+// =====================================================
+// 5b) FUNCIONÁRIOS (aba exclusiva)
+// =====================================================
+const MOTIVOS_FALTA = ['Falta', 'Atestado médico', 'Folga', 'Chuva / obra parada', 'Outro'];
+let equipe = { status: 'ativos', mes: `${agora.getFullYear()}-${pad(agora.getMonth() + 1)}`, func: '' };
+
+const nFaltas = n => String(n).replace('.', ',');
+const descFalta = x => `${x.tipo === 'meia' ? 'Meio dia' : 'Dia inteiro'} · ${esc(x.motivo || 'Falta')}${x.desconta === false ? ' · <b>não desconta</b>' : ''}${x.obs ? ' · ' + esc(x.obs) : ''}`;
+
+function resumoFunc(f, mes) {
+  const [a, b] = [`${mes}-01`, `${mes}-${pad(ultimoDia(+mes.slice(0, 4), +mes.slice(5) - 1))}`];
+  const l = folha(a, b).find(x => x.f.id === f.id);
+  const faltas = db.faltas.filter(x => x.funcionarioId === f.id && entre(x.data, a, b));
+  const vales = db.vales.filter(v => v.funcionarioId === f.id && entre(v.data, a, b));
+  return { a, b, l, faltas, vales };
+}
+
+VIEWS.equipe = () => {
+  const lista = db.funcionarios
+    .filter(f => equipe.status === 'todos' || (equipe.status === 'ativos' ? f.ativo !== false : f.ativo === false))
+    .sort((x, y) => x.nome.localeCompare(y.nome));
+  const ativos = db.funcionarios.filter(f => f.ativo !== false);
+  const [ma, mb] = [`${equipe.mes}-01`, `${equipe.mes}-${pad(ultimoDia(+equipe.mes.slice(0, 4), +equipe.mes.slice(5) - 1))}`];
+  const faltasMes = db.faltas.filter(x => entre(x.data, ma, mb) && (!equipe.func || x.funcionarioId === equipe.func))
+    .sort((x, y) => y.data.localeCompare(x.data));
+  const totalFaltasMes = faltasMes.reduce((t, x) => t + pesoFalta(x), 0);
+  const [mm, ma2] = [+equipe.mes.slice(5), equipe.mes.slice(0, 4)];
+  return `
+  <div class="grid grid-3">
+    <div class="stat"><div class="label">Funcionários ativos</div><div class="value">${ativos.length}</div></div>
+    <div class="stat"><div class="label">Custo por dia (diárias)</div><div class="value">${money(soma(ativos, f => f.diaria))}</div></div>
+    <div class="stat hl"><div class="label">Faltas em ${MESES[mm - 1]}</div><div class="value">${nFaltas(totalFaltasMes)} dia(s)</div></div>
+  </div>
+
+  <div class="section-head"><h2>Funcionários</h2>
+    <div class="row"><button class="btn sec" data-act="lancarFalta">+ Lançar falta</button><button class="btn" data-act="novoFunc">+ Novo funcionário</button></div></div>
+  <div class="card">
+    <div class="inline-filters" style="margin-bottom:6px">
+      <div><input id="buscaFunc" placeholder="🔎 Buscar por nome ou função…"></div>
+      <div style="flex:0 0 auto"><div class="seg">
+        ${[['ativos', 'Ativos'], ['inativos', 'Inativos'], ['todos', 'Todos']].map(([k, r]) => `<button type="button" class="${equipe.status === k ? 'active' : ''}" data-act="equipeStatus" data-s="${k}">${r}</button>`).join('')}
+      </div></div>
+    </div>
+    ${lista.length ? lista.map(f => {
+      const r = resumoFunc(f, equipe.mes);
+      const nf = r.faltas.reduce((t, x) => t + pesoFalta(x), 0);
+      return `<div class="list-item func-item" data-busca="${esc((f.nome + ' ' + (f.funcao || '')).toLowerCase())}" ${f.ativo === false ? 'style="opacity:.6"' : ''}>
+        <div class="avatar">${esc(f.nome.trim().split(/\s+/).map(p => p[0]).slice(0, 2).join('').toUpperCase())}</div>
+        <div class="info" data-act="verFunc" data-id="${f.id}" style="cursor:pointer">
+          <div class="title">${esc(f.nome)} ${f.ativo === false ? '<span class="badge gray">Inativo</span>' : ''}</div>
+          <div class="sub">${esc(f.funcao || 'Sem função')} · Diária ${money(f.diaria)}</div>
+          <div class="sub">${nf ? `<span class="badge warn">${nFaltas(nf)} falta(s) em ${MESES_C[mm - 1]}</span>` : `<span class="badge ok">Sem faltas em ${MESES_C[mm - 1]}</span>`}</div>
+        </div>
+        <div class="row func-btns" style="justify-content:flex-end">
+          ${f.ativo !== false ? `<button class="btn sec sm" data-act="lancarFalta" data-id="${f.id}">Falta</button>` : ''}
+          <button class="btn ghost sm" data-act="verFunc" data-id="${f.id}">Ficha</button>
+          <button class="btn ghost sm" data-act="editFunc" data-id="${f.id}">Editar</button>
+        </div>
+      </div>`;
+    }).join('') : `<div class="empty">${db.funcionarios.length ? 'Nenhum funcionário neste filtro' : 'Nenhum funcionário cadastrado. Toque em “+ Novo funcionário”.'}</div>`}
+  </div>
+
+  <div class="section-head"><h2>Faltas de ${MESES[mm - 1]}/${ma2}</h2></div>
+  <div class="card">
+    <div class="inline-filters" style="margin-bottom:6px">
+      <div><label>Mês</label><input type="month" value="${equipe.mes}" data-change="equipeMes"></div>
+      <div><label>Funcionário</label><select data-change="equipeFunc">${opt(db.funcionarios, equipe.func, 'Todos')}</select></div>
+    </div>
+    ${faltasMes.length ? faltasMes.map(x => `
+      <div class="list-item"><div class="info"><div class="title">${esc(byId('funcionarios', x.funcionarioId)?.nome || '—')}</div>
+        <div class="sub">${br(x.data)} (${['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][parse(x.data).getDay()]}) · ${descFalta(x)}</div></div>
+        <button class="btn ghost sm" data-act="editFalta" data-id="${x.id}">Editar</button>
+        <button class="btn danger sm" data-act="delFalta" data-id="${x.id}">Remover</button></div>`).join('') : '<div class="empty">Nenhuma falta neste mês</div>'}
+  </div>`;
+};
+
+POS.equipe = () => {
+  const busca = document.getElementById('buscaFunc');
+  busca.addEventListener('input', () => {
+    const q = busca.value.toLowerCase().trim();
+    document.querySelectorAll('[data-busca]').forEach(el => (el.hidden = q && !el.dataset.busca.includes(q)));
+  });
+};
+actions.equipeStatus = d => { equipe.status = d.s; render(); };
+changeActions.equipeMes = el => { if (el.value) { equipe.mes = el.value; render(); } };
+changeActions.equipeFunc = el => { equipe.func = el.value; render(); };
+
 function formFunc(f = {}) {
-  return `<label>Nome *</label><input name="nome" required value="${esc(f.nome)}">
+  return `<label>Nome completo *</label><input name="nome" required value="${esc(f.nome)}">
     <div class="grid grid-2">
       <div><label>Função</label><input name="funcao" value="${esc(f.funcao)}" placeholder="Pedreiro, servente…" list="funcoes"></div>
       <div><label>Valor da diária (R$) *</label><input name="diaria" required inputmode="decimal" value="${f.diaria ?? ''}"></div>
     </div>
     <datalist id="funcoes"><option>Pedreiro</option><option>Servente</option><option>Mestre de obras</option><option>Eletricista</option><option>Encanador</option><option>Pintor</option><option>Carpinteiro</option><option>Armador</option></datalist>
     <div class="grid grid-2">
-      <div><label>Telefone</label><input name="telefone" inputmode="tel" value="${esc(f.telefone)}"></div>
-      <div><label>Data de admissão</label><input type="date" name="admissao" value="${f.admissao || (f.id ? '' : hoje())}"></div>
+      <div><label>Telefone / WhatsApp</label><input name="telefone" inputmode="tel" value="${esc(f.telefone)}"></div>
+      <div><label>CPF</label><input name="cpf" inputmode="numeric" value="${esc(f.cpf)}"></div>
     </div>
-    <label>Chave PIX</label><input name="pix" value="${esc(f.pix)}">
-    <label class="check"><input type="checkbox" name="ativo" ${f.ativo !== false ? 'checked' : ''}> Funcionário ativo</label>`;
+    <div class="grid grid-2">
+      <div><label>Data de admissão</label><input type="date" name="admissao" value="${f.admissao || (f.id ? '' : hoje())}"></div>
+      <div><label>Chave PIX</label><input name="pix" value="${esc(f.pix)}"></div>
+    </div>
+    <label>Endereço</label><input name="endereco" value="${esc(f.endereco)}">
+    <label>Observações</label><textarea name="obs">${esc(f.obs)}</textarea>
+    <label class="check"><input type="checkbox" name="ativo" ${f.ativo !== false ? 'checked' : ''}> Funcionário ativo (desmarque quando sair da empresa)</label>`;
 }
 actions.novoFunc = () => abrirModal('Novo funcionário', formFunc(), d => { d.diaria = num(d.diaria); db.funcionarios.push({ id: uid(), criadoEm: hoje(), ...d }); toast('Funcionário cadastrado'); });
 actions.editFunc = ({ id }) => {
   const f = byId('funcionarios', id);
-  abrirModal('Editar funcionário', formFunc(f) + `<div class="row" style="margin-top:12px"><button type="button" class="btn danger sm" data-act="delFunc" data-id="${id}">Excluir funcionário</button></div>`, d => { d.diaria = num(d.diaria); Object.assign(f, d); });
+  abrirModal('Editar funcionário', formFunc(f) + `<div class="row" style="margin-top:12px"><button type="button" class="btn danger sm" data-act="delFunc" data-id="${id}">Excluir funcionário</button></div>`, d => { d.diaria = num(d.diaria); Object.assign(f, d); toast('Dados atualizados'); });
 };
 actions.delFunc = ({ id }) => {
   if (db.vales.some(v => v.funcionarioId === id) || db.faltas.some(v => v.funcionarioId === id))
-    return alert('Este funcionário tem vales ou faltas lançados. Marque-o como inativo em vez de excluir.');
+    return alert('Este funcionário tem vales ou faltas lançados. Desmarque "Funcionário ativo" em vez de excluir, assim o histórico é mantido.');
   fecharModal(); confirmarExcluir('funcionarios', id);
 };
-actions.lancarFalta = d => {
-  if (!db.funcionarios.length) return alert('Cadastre os funcionários primeiro.');
-  abrirModal('Lançar falta', `<label>Funcionário *</label><select name="funcionarioId" required>${opt(db.funcionarios.filter(f => f.ativo !== false), d.id, 'Selecione…')}</select>
-    <div class="grid grid-2">
-      <div><label>Data *</label><input type="date" name="data" required value="${hoje()}"></div>
-      <div><label>Tipo</label><select name="tipo"><option value="dia">Dia inteiro</option><option value="meia">Meio dia</option></select></div>
+
+actions.verFunc = ({ id }) => {
+  const f = byId('funcionarios', id);
+  const mesAtual = `${agora.getFullYear()}-${pad(agora.getMonth() + 1)}`;
+  const r = resumoFunc(f, mesAtual);
+  const [qa, qb] = rangeQuinzena(hoje());
+  const lq = folha(qa, qb).find(x => x.f.id === id);
+  const todas = db.faltas.filter(x => x.funcionarioId === id).sort((x, y) => y.data.localeCompare(x.data));
+  const linha = (rot, val) => val ? `<div class="list-item"><div class="info sub">${rot}</div><div>${val}</div></div>` : '';
+  abrirModal(f.nome, `
+    <div class="row" style="margin:6px 0 4px">
+      <span class="badge ${f.ativo === false ? 'gray' : 'ok'}">${f.ativo === false ? 'Inativo' : 'Ativo'}</span>
+      <span class="muted">${esc(f.funcao || '')}</span>
     </div>
-    <label>Motivo</label><input name="obs">`, f => {
-    if (db.faltas.some(x => x.funcionarioId === f.funcionarioId && x.data === f.data)) { alert('Já existe falta lançada neste dia para este funcionário.'); return false; }
-    db.faltas.push({ id: uid(), ...f }); toast('Falta lançada');
+    ${linha('Diária', money(f.diaria))}
+    ${linha('Telefone', esc(f.telefone))}
+    ${linha('CPF', esc(f.cpf))}
+    ${linha('PIX', esc(f.pix))}
+    ${linha('Admissão', br(f.admissao))}
+    ${linha('Endereço', esc(f.endereco))}
+    ${linha('Observações', esc(f.obs))}
+    <div class="grid grid-2" style="margin-top:12px">
+      <div class="stat"><div class="label">Quinzena atual (${br(qa).slice(0, 5)}–${br(qb).slice(0, 5)})</div><div class="value">${money(lq ? lq.liquido : 0)}</div><div class="sub muted">${lq ? nFaltas(lq.trab) : 0} dia(s) · ${lq ? nFaltas(lq.faltas) : 0} falta(s)${lq && lq.desc ? ` · vales -${money(lq.desc)}` : ''}</div></div>
+      <div class="stat"><div class="label">${MESES[agora.getMonth()]}</div><div class="value">${money(r.l ? r.l.liquido : 0)}</div><div class="sub muted">${r.l ? nFaltas(r.l.faltas) : 0} falta(s) · vales -${money(soma(r.vales))}</div></div>
+    </div>
+    <h4 style="margin:16px 0 4px">Faltas (${todas.length})</h4>
+    ${todas.length ? todas.slice(0, 30).map(x => `<div class="list-item"><div class="info"><div class="title">${br(x.data)}</div><div class="sub">${descFalta(x)}</div></div>
+      <button type="button" class="btn danger sm" data-act="delFalta" data-id="${x.id}">Remover</button></div>`).join('') : '<div class="empty">Nenhuma falta registrada</div>'}
+    <div class="row" style="margin-top:14px">
+      ${f.ativo !== false ? `<button type="button" class="btn" data-act="lancarFalta" data-id="${id}">+ Lançar falta</button>` : ''}
+      <button type="button" class="btn sec" data-act="editFunc" data-id="${id}">Editar dados</button>
+      ${f.telefone ? `<a class="btn wa" href="https://wa.me/${foneWa(f.telefone)}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
+    </div>`, null);
+};
+
+function formFalta(x = {}, idFunc) {
+  return `<label>Funcionário *</label><select name="funcionarioId" required>${opt(db.funcionarios.filter(f => f.ativo !== false || f.id === x.funcionarioId), x.funcionarioId || idFunc, 'Selecione…')}</select>
+    <div class="grid grid-2">
+      <div><label>Data *</label><input type="date" name="data" required value="${x.data || hoje()}"></div>
+      ${x.id ? '' : '<div><label>Até (vários dias, opcional)</label><input type="date" name="ate"></div>'}
+    </div>
+    <div class="grid grid-2">
+      <div><label>Tipo</label><select name="tipo"><option value="dia" ${x.tipo !== 'meia' ? 'selected' : ''}>Dia inteiro</option><option value="meia" ${x.tipo === 'meia' ? 'selected' : ''}>Meio dia</option></select></div>
+      <div><label>Motivo</label><select name="motivo">${optTxt(MOTIVOS_FALTA, x.motivo || 'Falta')}</select></div>
+    </div>
+    <label>Observação</label><input name="obs" value="${esc(x.obs)}">
+    <label class="check"><input type="checkbox" name="desconta" ${x.desconta !== false ? 'checked' : ''}> Descontar do pagamento</label>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 0">Desmarque para atestado ou folga paga: fica registrado, mas não reduz o pagamento.</p>`;
+}
+actions.lancarFalta = d => {
+  if (!db.funcionarios.some(f => f.ativo !== false)) return alert('Cadastre os funcionários primeiro.');
+  abrirModal('Lançar falta', formFalta({}, d.id), f => {
+    const ate = f.ate && f.ate > f.data ? f.ate : f.data;
+    delete f.ate;
+    let n = 0, rep = 0;
+    for (let dia = f.data; dia <= ate; dia = addDias(dia, 1)) {
+      const w = parse(dia).getDay();
+      if (dia !== f.data && (w === 0 || (w === 6 && !db.config.trabalhaSabado))) continue; // pula dias sem trabalho no intervalo
+      if (db.faltas.some(x => x.funcionarioId === f.funcionarioId && x.data === dia)) { rep++; continue; }
+      db.faltas.push({ id: uid(), ...f, data: dia }); n++;
+    }
+    if (!n) { alert('Já existe falta lançada nesta data para este funcionário.'); return false; }
+    toast(`${n} falta(s) lançada(s)${rep ? ` · ${rep} já existia(m)` : ''}`);
+  }, 'Lançar');
+};
+actions.editFalta = ({ id }) => {
+  const x = byId('faltas', id);
+  abrirModal('Editar falta', formFalta(x), f => {
+    if (db.faltas.some(o => o.id !== id && o.funcionarioId === f.funcionarioId && o.data === f.data)) { alert('Já existe falta neste dia para este funcionário.'); return false; }
+    Object.assign(x, f);
   });
 };
-actions.delFalta = ({ id }) => confirmarExcluir('faltas', id, 'Remover esta falta?');
+actions.delFalta = ({ id }) => { fecharModal(); confirmarExcluir('faltas', id, 'Remover esta falta?'); };
 
 actions.pdfFolha = () => {
   if (!window.jspdf) return alert('Sem internet para carregar o gerador de PDF.');
   const [a, b] = periodoPag();
-  const linhas = folha(a, b, pag.descontarVales);
+  const linhas = folha(a, b);
   const [y, m] = pag.mes.split('-').map(Number);
   const nomeTipo = pag.tipo === 'mes' ? 'MENSAL' : pag.tipo === 'q1' ? '1ª QUINZENA' : '2ª QUINZENA';
   const doc = novoPdf(`PAGAMENTO ${nomeTipo}`);
   doc.setFontSize(10);
   doc.text(`Período: ${br(a)} a ${br(b)} (${MESES[m - 1]}/${y})  ·  Dias úteis: ${diasUteis(a, b)}${db.config.trabalhaSabado ? ' (seg a sáb)' : ' (seg a sex)'}`, 14, 40);
-  const head = ['Funcionário', 'Função', 'Diária', 'Dias', 'Faltas', 'Trabalhados', ...(pag.descontarVales ? ['Vales'] : []), 'A pagar', 'PIX'];
+  const head = ['Funcionário', 'Função', 'Diária', 'Dias', 'Faltas', 'Trab.', 'Bruto', 'Vales (adiant.)', 'A pagar', 'PIX'];
   const body = linhas.map(l => [l.f.nome, l.f.funcao || '', money(l.f.diaria), l.dias, String(l.faltas).replace('.', ','), String(l.trab).replace('.', ','),
-    ...(pag.descontarVales ? ['-' + money(l.desc)] : []), money(l.liquido), l.f.pix || '']);
+    money(l.bruto), l.desc ? '-' + money(l.desc) : '—', money(l.liquido), l.f.pix || '']);
   const total = linhas.reduce((t, l) => t + l.liquido, 0);
   const cols = head.length;
   doc.autoTable({
@@ -898,7 +1041,7 @@ actions.pdfFolha = () => {
     footStyles: { fillColor: [237, 233, 254], textColor: 30, fontStyle: 'bold' },
   });
   // detalhamento das faltas
-  const det = linhas.flatMap(l => l.listaFaltas.map(x => [l.f.nome, br(x.data), x.tipo === 'meia' ? 'Meio dia' : 'Dia inteiro', x.obs || '']));
+  const det = linhas.flatMap(l => l.listaFaltas.map(x => [l.f.nome, br(x.data), x.tipo === 'meia' ? 'Meio dia' : 'Dia inteiro', (x.motivo || 'Falta') + (x.desconta === false ? ' (não desconta)' : '') + (x.obs ? ' — ' + x.obs : '')]));
   if (det.length) {
     doc.setFontSize(11); doc.text('Faltas no período', 14, doc.lastAutoTable.finalY + 10);
     doc.autoTable({ startY: doc.lastAutoTable.finalY + 13, head: [['Funcionário', 'Data', 'Tipo', 'Motivo']], body: det, ...corTabela });
@@ -915,11 +1058,14 @@ let gastoRef = { tipo: 'mes', data: hoje() };
 function gastosPeriodo(a, b) {
   const desp = db.despesas.filter(d => entre(d.data, a, b));
   const vales = soma(db.vales.filter(v => entre(v.data, a, b)));
-  const folhaT = folha(a, b, false, true).reduce((t, l) => t + l.bruto, 0);
+  // vale é adiantamento: já faz parte da mão de obra. Conta o maior entre o ganho e o adiantado.
+  const fl = folha(a, b, true);
+  const valesFora = soma(db.vales.filter(v => entre(v.data, a, b) && !fl.some(l => l.f.id === v.funcionarioId)));
+  const folhaT = fl.reduce((t, l) => t + Math.max(l.bruto, l.vales), 0) + valesFora;
   const porCat = {};
   desp.forEach(d => (porCat[d.categoria] = (porCat[d.categoria] || 0) + num(d.valor)));
   const despT = soma(desp);
-  return { desp, vales, folha: folhaT, despT, porCat, total: despT + vales + folhaT };
+  return { desp, vales, folha: folhaT, despT, porCat, total: despT + folhaT };
 }
 
 VIEWS.gastos = () => {
@@ -945,7 +1091,7 @@ VIEWS.gastos = () => {
     <div class="card">
       <b>Composição dos gastos</b>
       <div class="list-item"><div class="info">👷 Mão de obra (diárias − faltas)</div><div class="amount">${money(g.folha)}</div></div>
-      <div class="list-item"><div class="info">⛽ Vales combustível</div><div class="amount">${money(g.vales)}</div></div>
+      ${g.vales ? `<div class="list-item"><div class="info sub">&nbsp;&nbsp;↳ já adiantado em vales (incluído acima)</div><div class="sub">${money(g.vales)}</div></div>` : ''}
       ${Object.entries(g.porCat).map(([c, v]) => `<div class="list-item"><div class="info">🧾 ${esc(c)}</div><div class="amount">${money(v)}</div></div>`).join('')}
       <div class="list-item"><div class="info"><b>Total</b></div><div class="amount">${money(g.total)}</div></div>
     </div>
@@ -959,14 +1105,14 @@ VIEWS.gastos = () => {
       <div class="sub">${br(d.data)} · ${esc(d.categoria)}${d.obraId ? ' · ' + esc(byId('obras', d.obraId)?.nome || '') : ''}</div></div>
       <div class="amount" style="color:var(--danger)">${money(d.valor)}</div>
       <button class="btn ghost sm" data-act="editDespesa" data-id="${d.id}">Editar</button></div>`).join('') : '<div class="empty">Nenhuma despesa no período</div>'}</div>
-  <p class="muted" style="font-size:13px">A mão de obra é calculada automaticamente pelas diárias dos funcionários ativos (da admissão até hoje), descontando as faltas. Os vales vêm da aba Combustível.</p>`;
+  <p class="muted" style="font-size:13px">A mão de obra é calculada automaticamente pelas diárias dos funcionários ativos (da admissão até hoje), descontando as faltas. Os vales de combustível são adiantamento de salário, por isso já estão dentro da mão de obra.</p>`;
 };
 
 POS.gastos = () => {
   const [a, b] = rangePor(gastoRef.tipo, gastoRef.data);
   const g = gastosPeriodo(a, b);
-  const labels = ['Mão de obra', 'Combustível (vales)', ...Object.keys(g.porCat)];
-  const data = [g.folha, g.vales, ...Object.values(g.porCat)];
+  const labels = ['Mão de obra', ...Object.keys(g.porCat)];
+  const data = [g.folha, ...Object.values(g.porCat)];
   const el = document.getElementById('chGastos');
   if (!el || !window.Chart) return;
   if (!data.some(Boolean)) { el.parentElement.innerHTML = '<div class="empty">Sem gastos no período</div>'; return; }
@@ -1001,7 +1147,7 @@ actions.pdfGastos = () => {
   const doc = novoPdf('RELATÓRIO DE GASTOS');
   doc.setFontSize(10); doc.text(`Período: ${br(a)} a ${br(b)}`, 14, 40);
   doc.autoTable({ startY: 45, head: [['Resumo', 'Valor']], ...corTabela, columnStyles: { 1: { halign: 'right' } },
-    body: [['Mão de obra (diárias − faltas)', money(g.folha)], ['Vales combustível', money(g.vales)], ...Object.entries(g.porCat).map(([c, v]) => [c, money(v)]),
+    body: [['Mão de obra (diárias − faltas)', money(g.folha)], ['   (já adiantado em vales)', money(g.vales)], ...Object.entries(g.porCat).map(([c, v]) => [c, money(v)]),
       [{ content: 'Total de gastos', styles: { fontStyle: 'bold' } }, { content: money(g.total), styles: { fontStyle: 'bold' } }],
       ['Faturamento no período', money(fat)], [{ content: 'Saldo', styles: { fontStyle: 'bold' } }, { content: money(fat - g.total), styles: { fontStyle: 'bold' } }]] });
   if (g.desp.length) {
@@ -1029,7 +1175,7 @@ actions.pdfVale = ({ id }) => {
   const v = byId('vales', id), f = byId('funcionarios', v.funcionarioId) || {}, p = byId('postos', v.postoId) || {};
   const doc = novoPdf('VALE COMBUSTÍVEL');
   doc.setFontSize(12);
-  const linhas = [['Colaborador', f.nome || ''], ['Posto', p.nome || ''], ['Data', br(v.data)], ['Valor liberado', money(v.valor)], ['Observação', v.obs || '—']];
+  const linhas = [['Colaborador', f.nome || ''], ['Posto', p.nome || ''], ['Data', br(v.data)], ['Valor do vale', money(v.valor)], ['Tipo', 'Adiantamento de salário — será descontado no pagamento'], ['Observação', v.obs || '—']];
   doc.autoTable({ startY: 42, body: linhas, theme: 'grid', styles: { fontSize: 12, cellPadding: 4 }, columnStyles: { 0: { fontStyle: 'bold', cellWidth: 55, fillColor: [237, 233, 254] } } });
   const y = doc.lastAutoTable.finalY + 30;
   doc.line(20, y, 95, y); doc.line(115, y, 190, y);

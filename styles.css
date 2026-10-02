@@ -212,3 +212,12 @@ textarea { min-height: 70px; resize: vertical; }
 .update-bar .btn { background: #fff; color: #15803d; }
 .link-box { display: flex; gap: 8px; }
 .link-box input { flex: 1; font-size: 14px; }
+
+.avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--primary-soft); color: var(--primary); display: grid; place-items: center; font-weight: 700; font-size: 14px; flex: 0 0 auto; }
+[data-busca][hidden] { display: none; }
+@media (max-width: 560px) {
+  .func-item { flex-wrap: wrap; }
+  .func-item .info { flex: 1 1 calc(100% - 60px); }
+  .func-item .func-btns { flex: 1 1 100%; padding-left: 52px; }
+  .func-item .func-btns .btn { flex: 1; justify-content: center; }
+}
