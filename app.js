@@ -4,7 +4,7 @@
 // ---------- Dados ----------
 const KEY = 'construtora-jr-v1';
 // Versão do app — ao publicar mudanças, aumente aqui E no arquivo version.json
-const APP_VERSION = '1.1.1';
+const APP_VERSION = '1.1.2';
 
 const CATALOGO_PADRAO = [
   ['material', 'Tijolo 8 furos', 'milheiro', 900],
@@ -569,7 +569,7 @@ function viewEditorOrc() {
     <div><div class="muted" style="font-size:12px">Total do orçamento</div><div class="big" id="orcTotal">${money(totalRasc())}</div></div>
     <div class="spacer"></div>
     <button class="btn" data-act="salvarOrc">💾 Salvar</button>
-    <button class="btn wa" data-act="salvarEnviarOrc">📲 Salvar e enviar PDF</button>
+    <button class="btn wa" data-act="salvarEnviarOrc">${ehCelular() ? "📲 Salvar e enviar PDF" : "⬇️ Salvar e baixar PDF"}</button>
   </div>`;
 }
 
@@ -688,19 +688,21 @@ function rodapePdf(doc) {
 }
 const corTabela = { headStyles: { fillColor: [124, 58, 237] }, styles: { fontSize: 9 }, alternateRowStyles: { fillColor: [246, 244, 251] } };
 
+// Celular/tablet: abre o compartilhamento (WhatsApp etc.). Computador: baixa o PDF direto.
+const ehCelular = () => (navigator.userAgentData && navigator.userAgentData.mobile) ||
+  /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+  (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent)); // iPad
+
 async function compartilharPdf(doc, arquivo, telefone, texto) {
-  const blob = doc.output('blob');
-  const file = new File([blob], arquivo, { type: 'application/pdf' });
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: arquivo, text: texto }); return; }
-    catch (e) { if (e.name === 'AbortError') return; }
+  if (ehCelular()) {
+    const file = new File([doc.output('blob')], arquivo, { type: 'application/pdf' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: arquivo, text: texto }); return; }
+      catch (e) { if (e.name === 'AbortError') return; }
+    }
   }
   doc.save(arquivo);
-  if (telefone !== undefined) {
-    const fone = foneWa(telefone);
-    setTimeout(() => window.open(`https://wa.me/${fone}?text=${encodeURIComponent(texto)}`, '_blank'), 600);
-    toast('PDF baixado — anexe o arquivo na conversa do WhatsApp');
-  }
+  toast('PDF baixado: ' + arquivo);
 }
 
 function enviarPdfOrc(o) {

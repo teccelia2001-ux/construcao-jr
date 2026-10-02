@@ -18,7 +18,7 @@ App web (funciona no celular e no computador, inclusive offline) para a gestão 
 
 Abra o `index.html` no navegador ou publique pelo GitHub Pages. No celular, use **"Adicionar à tela inicial"** para ele virar um app.
 
-**Envio por WhatsApp:** no celular, o botão de PDF abre o compartilhamento do sistema e você escolhe o WhatsApp. No computador, o PDF é baixado e a conversa do cliente abre no WhatsApp Web para você anexar o arquivo.
+**PDFs:** no celular, o botão de PDF abre o compartilhamento do sistema para enviar pelo WhatsApp. No computador, o PDF é baixado direto na pasta Downloads.
 
 ## Visual
 
