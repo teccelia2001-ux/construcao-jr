@@ -1,4 +1,6 @@
-# Construtora JR — App de gestão
+# JR Construções — App de gestão
+
+> Sua obra em boas mãos
 
 App web (funciona no celular e no computador, inclusive offline) para a gestão da construtora. Os dados ficam salvos no próprio aparelho, com backup e restauração em arquivo na tela ⚙️.
 
@@ -23,7 +25,10 @@ Abra o `index.html` no navegador ou publique pelo GitHub Pages. No celular, use 
 
 ## Visual
 
-As cores ficam em variáveis no topo do `styles.css` (`--primary`, `--accent`…). Para deixar igual a outro app, troque só esses valores.
+Identidade da JR Construções: azul-marinho com detalhes em azul e prata, nas cores da logo.
+
+- A logo e os ícones ficam em `img/`: `icon-192/512.png` é o ícone da tela inicial, `logo.jpg` é a tela de abertura e o fundo, `logo-pdf.jpg` vai no cabeçalho dos PDFs.
+- As cores ficam nas variáveis no topo do `styles.css`.
 
 ## Link para o celular (GitHub Pages)
 

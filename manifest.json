@@ -1,12 +1,32 @@
 {
-  "name": "Construtora JR",
-  "short_name": "Construtora JR",
+  "name": "JR Construções",
+  "short_name": "JR Construções",
+  "description": "Gestão da JR Construções — Sua obra em boas mãos",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#f6f4fb",
-  "theme_color": "#7c3aed",
+  "orientation": "portrait",
+  "background_color": "#061a2e",
+  "theme_color": "#061a2e",
   "lang": "pt-BR",
   "icons": [
-    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    {
+      "src": "img/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "img/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }

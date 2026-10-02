@@ -1,5 +1,5 @@
 // Service worker: busca sempre a versão mais nova na internet e usa a cópia salva quando estiver offline.
-const CACHE = 'construtora-jr-v2';
+const CACHE = 'construtora-jr-v3';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));

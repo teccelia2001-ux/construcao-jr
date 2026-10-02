@@ -4,7 +4,7 @@
 // ---------- Dados ----------
 const KEY = 'construtora-jr-v1';
 // Versão do app — ao publicar mudanças, aumente aqui, no version.json e nos ?v= do index.html
-const APP_VERSION = '1.3.1';
+const APP_VERSION = '1.4.0';
 
 const CATALOGO_PADRAO = [
   ['material', 'Tijolo 8 furos', 'milheiro', 900],
@@ -34,13 +34,13 @@ const CATALOGO_PADRAO = [
 ];
 
 const CATEGORIAS_GASTO = ['Material', 'Ferramentas', 'Combustível', 'Alimentação', 'Aluguel', 'Transporte', 'Impostos', 'Outros'];
-const CORES = ['#7c3aed', '#ec4899', '#0ea5e9', '#16a34a', '#f59e0b', '#ef4444', '#14b8a6', '#8b5cf6', '#f97316'];
+const CORES = ['#3b82f6', '#38bdf8', '#94a3b8', '#22c55e', '#f59e0b', '#a78bfa', '#f472b6', '#14b8a6', '#f87171'];
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
 function estadoInicial() {
   return {
-    config: { empresa: 'Construtora JR', telefone: '', cnpj: '', endereco: '', trabalhaSabado: true },
+    config: { empresa: 'JR Construções', telefone: '', cnpj: '', endereco: '', trabalhaSabado: true },
     clientes: [], obras: [], receitas: [], postos: [], vales: [],
     catalogo: CATALOGO_PADRAO.map(([tipo, nome, unidade, preco]) => ({ id: uid(), tipo, nome, unidade, preco })),
     orcamentos: [], funcionarios: [], faltas: [], despesas: [], empreitadas: [],
@@ -52,7 +52,9 @@ function carregar() {
     const salvo = JSON.parse(localStorage.getItem(KEY));
     if (salvo) {
       const base = estadoInicial();
-      return { ...base, ...salvo, config: { ...base.config, ...(salvo.config || {}) } };
+      const cfg = { ...base.config, ...(salvo.config || {}) };
+      if (cfg.empresa === 'Construtora JR') cfg.empresa = 'JR Construções'; // nome antigo padrão
+      return { ...base, ...salvo, config: cfg };
     }
   } catch (e) { /* ignora */ }
   return estadoInicial();
@@ -144,7 +146,7 @@ let charts = [];
 function render() {
   charts.forEach(c => c.destroy()); charts = [];
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === aba));
-  document.getElementById('empresaNome').textContent = db.config.empresa || 'Construtora JR';
+  document.getElementById('empresaNome').textContent = db.config.empresa || 'JR Construções';
   document.getElementById('hojeLabel').textContent = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
   const v = document.getElementById('view');
   v.innerHTML = (VIEWS[aba] || VIEWS.agenda)();
@@ -332,8 +334,7 @@ VIEWS.faturamento = () => {
 function chartBar(id, labels, datasets, opts = {}) {
   const el = document.getElementById(id);
   if (!el || !window.Chart) return;
-  const dark = matchMedia('(prefers-color-scheme: dark)').matches;
-  const cor = dark ? '#a49cbc' : '#6b6480', grade = dark ? '#2f2943' : '#eee9f7';
+  const cor = '#93a4bd', grade = '#1c3a63';
   charts.push(new Chart(el, {
     type: opts.type || 'bar',
     data: { labels, datasets: datasets.map((d, i) => ({ borderRadius: 6, maxBarThickness: 38, backgroundColor: d.cor || CORES[i], borderColor: d.cor || CORES[i], tension: .3, ...d })) },
@@ -342,7 +343,7 @@ function chartBar(id, labels, datasets, opts = {}) {
       plugins: { legend: { display: datasets.length > 1, labels: { color: cor } }, tooltip: { callbacks: { label: c => `${c.dataset.label || ''} ${money(c.parsed.y)}` } } },
       scales: {
         x: { ticks: { color: cor }, grid: { display: false } },
-        y: { beginAtZero: true, ticks: { color: cor, callback: v => v >= 1000 ? 'R$ ' + (v / 1000) + 'k' : 'R$ ' + v }, grid: { color: grade } },
+        y: { beginAtZero: true, ticks: { color: cor, precision: 0, callback: v => v >= 1000 ? 'R$ ' + (v / 1000) + 'k' : 'R$ ' + v }, grid: { color: grade } },
       },
     },
   }));
@@ -362,7 +363,7 @@ POS.faturamento = () => {
   // meses (com gastos para comparação)
   const fatM = MESES_C.map((_, m) => soma(db.receitas.filter(r => r.data.startsWith(`${fatAno}-${pad(m + 1)}`))));
   const gasM = MESES_C.map((_, m) => gastosPeriodo(`${fatAno}-${pad(m + 1)}-01`, iso(new Date(fatAno, m + 1, 0))).total);
-  chartBar('chMes', MESES_C, [{ label: 'Faturamento', data: fatM, cor: '#7c3aed' }, { label: 'Gastos', data: gasM, cor: '#ec4899' }]);
+  chartBar('chMes', MESES_C, [{ label: 'Faturamento', data: fatM, cor: '#3b82f6' }, { label: 'Gastos', data: gasM, cor: '#94a3b8' }]);
   // anos
   const anos = [...new Set(db.receitas.map(r => r.data.slice(0, 4)))].sort();
   if (!anos.length) anos.push(String(new Date().getFullYear()));
@@ -665,17 +666,26 @@ actions.delItemCat = ({ id }) => {
 };
 
 // ---------- PDF ----------
+let logoPdf = null; // logo em base64 para o cabeçalho dos PDFs
+fetch('img/logo-pdf.jpg').then(r => r.blob()).then(b => new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(b); }))
+  .then(d => (logoPdf = d)).catch(() => {});
+
 function novoPdf(titulo) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const c = db.config;
-  doc.setFillColor(124, 58, 237); doc.rect(0, 0, 210, 30, 'F');
-  doc.setTextColor(255); doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
-  doc.text(c.empresa || 'Construtora JR', 14, 14);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-  doc.text([c.cnpj ? 'CNPJ: ' + c.cnpj : '', c.telefone ? 'Tel/WhatsApp: ' + c.telefone : '', c.endereco || ''].filter(Boolean).join('   ·   '), 14, 22);
-  doc.setFontSize(13); doc.setFont('helvetica', 'bold');
-  doc.text(titulo, 196, 14, { align: 'right' });
+  doc.setFillColor(6, 26, 46); doc.rect(0, 0, 210, 32, 'F');
+  doc.setFillColor(37, 99, 235); doc.rect(0, 32, 210, 1.2, 'F');
+  let x = 14;
+  if (logoPdf) { doc.addImage(logoPdf, 'JPEG', 10, 3, 40, 25.7); x = 55; }
+  doc.setTextColor(255); doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
+  doc.text(c.empresa || 'JR Construções', x, 13);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(203, 213, 225);
+  const info = [c.cnpj ? 'CNPJ: ' + c.cnpj : '', c.telefone ? 'Tel/WhatsApp: ' + c.telefone : ''].filter(Boolean).join('   ·   ');
+  if (info) doc.text(info, x, 19);
+  if (c.endereco) doc.text(c.endereco, x, 24);
+  doc.setTextColor(255); doc.setFontSize(12); doc.setFont('helvetica', 'bold');
+  doc.text(titulo, 196, 13, { align: 'right' });
   doc.setTextColor(30); doc.setFont('helvetica', 'normal');
   return doc;
 }
@@ -686,7 +696,7 @@ function rodapePdf(doc) {
     doc.text(`Gerado em ${new Date().toLocaleString('pt-BR')} · Página ${i} de ${n}`, 105, 290, { align: 'center' });
   }
 }
-const corTabela = { headStyles: { fillColor: [124, 58, 237] }, styles: { fontSize: 9 }, alternateRowStyles: { fillColor: [246, 244, 251] } };
+const corTabela = { headStyles: { fillColor: [11, 39, 68] }, styles: { fontSize: 9 }, alternateRowStyles: { fillColor: [240, 245, 252] } };
 
 // Celular/tablet: abre o compartilhamento (WhatsApp etc.). Computador: baixa o PDF direto.
 const ehCelular = () => (navigator.userAgentData && navigator.userAgentData.mobile) ||
@@ -718,7 +728,7 @@ function enviarPdfOrc(o) {
   if (cli.telefone) { doc.text(`Telefone: ${cli.telefone}`, 14, y); y += 6; }
   if (obra || cli.endereco) { doc.text(`Obra: ${obra ? obra.nome : ''}${(obra?.endereco || cli.endereco) ? ' — ' + (obra?.endereco || cli.endereco) : ''}`, 14, y); y += 6; }
 
-  const grupo = (titulo, itens) => itens.length ? [[{ content: titulo, colSpan: 5, styles: { fontStyle: 'bold', fillColor: [237, 233, 254] } }],
+  const grupo = (titulo, itens) => itens.length ? [[{ content: titulo, colSpan: 5, styles: { fontStyle: 'bold', fillColor: [226, 236, 250] } }],
     ...itens.map(i => [i.nome, i.unidade, String(i.qtd).replace('.', ','), money(i.preco), money(i.qtd * i.preco)])] : [];
   const body = [
     ...grupo('Materiais', o.itens.filter(i => i.tipo === 'material')),
@@ -1038,7 +1048,7 @@ actions.pdfFolha = () => {
   doc.autoTable({
     startY: 45, head: [head], body, ...corTabela,
     foot: [[{ content: 'TOTAL', colSpan: cols - 2 }, money(total), '']],
-    footStyles: { fillColor: [237, 233, 254], textColor: 30, fontStyle: 'bold' },
+    footStyles: { fillColor: [226, 236, 250], textColor: 30, fontStyle: 'bold' },
   });
   // detalhamento das faltas
   const det = linhas.flatMap(l => l.listaFaltas.map(x => [l.f.nome, br(x.data), x.tipo === 'meia' ? 'Meio dia' : 'Dia inteiro', (x.motivo || 'Falta') + (x.desconta === false ? ' (não desconta)' : '') + (x.obs ? ' — ' + x.obs : '')]));
@@ -1120,7 +1130,7 @@ POS.gastos = () => {
     type: 'doughnut',
     data: { labels, datasets: [{ data, backgroundColor: CORES, borderWidth: 0 }] },
     options: { responsive: true, maintainAspectRatio: false, cutout: '62%',
-      plugins: { legend: { position: 'bottom', labels: { color: matchMedia('(prefers-color-scheme: dark)').matches ? '#a49cbc' : '#6b6480', boxWidth: 12 } },
+      plugins: { legend: { position: 'bottom', labels: { color: '#93a4bd', boxWidth: 12 } },
         tooltip: { callbacks: { label: c => `${c.label}: ${money(c.parsed)}` } } } },
   }));
 };
@@ -1166,7 +1176,7 @@ actions.pdfVales = () => {
   doc.setFontSize(10); doc.text(`Período: ${br(a)} a ${br(b)}`, 14, 40);
   doc.autoTable({ startY: 45, head: [['Data', 'Colaborador', 'Posto', 'Valor']], ...corTabela, columnStyles: { 3: { halign: 'right' } },
     body: vales.map(v => [br(v.data), byId('funcionarios', v.funcionarioId)?.nome || '', byId('postos', v.postoId)?.nome || '', money(v.valor)]),
-    foot: [[{ content: 'TOTAL', colSpan: 3 }, money(soma(vales))]], footStyles: { fillColor: [237, 233, 254], textColor: 30 } });
+    foot: [[{ content: 'TOTAL', colSpan: 3 }, money(soma(vales))]], footStyles: { fillColor: [226, 236, 250], textColor: 30 } });
   rodapePdf(doc);
   compartilharPdf(doc, `Vales_${a}_a_${b}.pdf`, undefined, `Vales combustível ${br(a)} a ${br(b)}`);
 };
@@ -1176,7 +1186,7 @@ actions.pdfVale = ({ id }) => {
   const doc = novoPdf('VALE COMBUSTÍVEL');
   doc.setFontSize(12);
   const linhas = [['Colaborador', f.nome || ''], ['Posto', p.nome || ''], ['Data', br(v.data)], ['Valor do vale', money(v.valor)], ['Tipo', 'Adiantamento de salário — será descontado no pagamento'], ['Observação', v.obs || '—']];
-  doc.autoTable({ startY: 42, body: linhas, theme: 'grid', styles: { fontSize: 12, cellPadding: 4 }, columnStyles: { 0: { fontStyle: 'bold', cellWidth: 55, fillColor: [237, 233, 254] } } });
+  doc.autoTable({ startY: 42, body: linhas, theme: 'grid', styles: { fontSize: 12, cellPadding: 4 }, columnStyles: { 0: { fontStyle: 'bold', cellWidth: 55, fillColor: [226, 236, 250] } } });
   const y = doc.lastAutoTable.finalY + 30;
   doc.line(20, y, 95, y); doc.line(115, y, 190, y);
   doc.setFontSize(9); doc.text('Responsável — ' + (db.config.empresa || ''), 57, y + 5, { align: 'center' }); doc.text('Colaborador', 152, y + 5, { align: 'center' });
@@ -1401,7 +1411,11 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
 // remove o ?v= da barra de endereço depois de atualizar
 if (/[?&]v=/.test(location.search)) history.replaceState(null, '', location.pathname + location.hash);
 
+const ajustarTopo = () => document.documentElement.style.setProperty('--topbar-h', document.querySelector('.topbar').offsetHeight + 'px');
+window.addEventListener('resize', ajustarTopo);
 render();
+ajustarTopo();
+setTimeout(() => { const sp = document.getElementById('splash'); if (sp) { sp.classList.add('out'); setTimeout(() => sp.remove(), 600); } }, 1100);
 verificarVersao();
 setInterval(verificarVersao, 30 * 60 * 1000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) verificarVersao(); });
