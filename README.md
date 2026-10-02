@@ -39,5 +39,6 @@ Para ativar (uma vez só):
 - A versão aparece no topo do app (ex.: `v1.1.0`) e em ⚙️ → *Versão do app*.
 - O app verifica sozinho, ao abrir e a cada 30 minutos, se há versão nova no site. Quando há, aparece uma faixa verde com o botão **Atualizar agora**.
 - Atualizar **não apaga os dados**: eles ficam no aparelho.
-- **Para publicar uma versão nova:** aumente o número em `APP_VERSION` (início do `app.js`) **e** em `version.json`, os dois iguais, e envie para o GitHub.
+- **Para publicar uma versão nova:** aumente o número, sempre igual, em três lugares: `APP_VERSION` (início do `app.js`), `version.json` e os `?v=` do `index.html`. Depois envie para o GitHub.
+- O botão **Atualizar** limpa a cópia offline, baixa os arquivos novos e confere se a versão mudou. Se não mudou, tenta mais uma vez sozinho.
 - O app funciona offline com a última versão baixada.

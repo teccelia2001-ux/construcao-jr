@@ -3,8 +3,8 @@
 
 // ---------- Dados ----------
 const KEY = 'construtora-jr-v1';
-// Versão do app — ao publicar mudanças, aumente aqui E no arquivo version.json
-const APP_VERSION = '1.3.0';
+// Versão do app — ao publicar mudanças, aumente aqui, no version.json e nos ?v= do index.html
+const APP_VERSION = '1.3.1';
 
 const CATALOGO_PADRAO = [
   ['material', 'Tijolo 8 furos', 'milheiro', 900],
@@ -1363,15 +1363,31 @@ async function verificarVersao(avisar = false) {
 actions.verificarAtualizacao = () => verificarVersao(true);
 actions.atualizarApp = async () => {
   toast('Atualizando…');
-  try {
-    if ('caches' in window) { for (const k of await caches.keys()) await caches.delete(k); }
-    if (navigator.serviceWorker) {
-      const reg = await navigator.serviceWorker.getRegistration();
-      if (reg) await reg.update();
-    }
-  } catch (e) { /* segue para recarregar */ }
+  try { sessionStorage.setItem(KEY + ':alvo', versaoRemota ? versaoRemota.version : ''); } catch (e) { /* ignora */ }
+  await limparCacheApp();
   location.replace(location.pathname + '?v=' + Date.now() + location.hash);
 };
+// Remove a cópia offline e o service worker para forçar o download dos arquivos novos
+async function limparCacheApp() {
+  try {
+    if ('caches' in window) { for (const k of await caches.keys()) await caches.delete(k); }
+    if (navigator.serviceWorker) { for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister(); }
+  } catch (e) { /* segue para recarregar */ }
+}
+// Depois de recarregar: confirma se pegou a versão nova; se não, tenta mais uma vez
+(async () => {
+  let alvo = null, tentou = false;
+  try { alvo = sessionStorage.getItem(KEY + ':alvo'); tentou = sessionStorage.getItem(KEY + ':tentou') === '1'; } catch (e) { return; }
+  if (alvo === null) return;
+  if (alvo && cmpVersao(APP_VERSION, alvo) < 0 && !tentou) {
+    try { sessionStorage.setItem(KEY + ':tentou', '1'); } catch (e) { /* ignora */ }
+    await limparCacheApp();
+    location.replace(location.pathname + '?v=' + Date.now() + '&r=2' + location.hash);
+    return;
+  }
+  try { sessionStorage.removeItem(KEY + ':alvo'); sessionStorage.removeItem(KEY + ':tentou'); } catch (e) { /* ignora */ }
+  toast(cmpVersao(APP_VERSION, alvo || '0') >= 0 ? `App atualizado para v${APP_VERSION} ✔` : 'Não foi possível atualizar agora. Feche e abra o app de novo.');
+})();
 actions.copiarLink = async () => {
   const v = document.getElementById('linkApp').value;
   try { await navigator.clipboard.writeText(v); toast('Link copiado'); }
@@ -1383,7 +1399,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 // remove o ?v= da barra de endereço depois de atualizar
-if (location.search.includes('v=')) history.replaceState(null, '', location.pathname + location.hash);
+if (/[?&]v=/.test(location.search)) history.replaceState(null, '', location.pathname + location.hash);
 
 render();
 verificarVersao();
