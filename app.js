@@ -4,7 +4,7 @@
 // ---------- Dados ----------
 const KEY = 'construtora-jr-v1';
 // Versão do app — ao publicar mudanças, aumente aqui, no version.json e nos ?v= do index.html
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.5.0';
 
 const CATALOGO_PADRAO = [
   ['material', 'Tijolo 8 furos', 'milheiro', 900],
@@ -165,83 +165,136 @@ document.addEventListener('click', e => {
 });
 
 // =====================================================
-// 1) AGENDA DE OBRAS
+// 1) OBRAS
 // =====================================================
-let cal = (() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth(), sel: hoje() }; })();
-const STATUS_OBRA = ['Agendada', 'Em andamento', 'Concluída', 'Pausada'];
-const corObra = o => CORES[db.obras.indexOf(o) % CORES.length];
+const STATUS_OBRA = ['Agendada', 'Em andamento', 'Pausada', 'Concluída'];
 const badgeStatus = s => `<span class="badge ${s === 'Concluída' ? 'ok' : s === 'Em andamento' ? '' : s === 'Pausada' ? 'warn' : 'gray'}">${esc(s)}</span>`;
-
-function obrasNoDia(dia) { return db.obras.filter(o => o.inicio && entre(dia, o.inicio, o.fim || o.inicio)); }
+let filtroObras = { status: 'ativas' };
 
 function duracao(o) {
   if (!o.inicio) return '';
   const dias = Math.round((parse(o.fim || o.inicio) - parse(o.inicio)) / 864e5) + 1;
   return `${dias} dia${dias > 1 ? 's' : ''}`;
 }
+// andamento pelo prazo: % de dias já decorridos
+function progressoObra(o) {
+  if (o.status === 'Concluída') return 100;
+  if (!o.inicio || hoje() < o.inicio) return 0;
+  const tot = (parse(o.fim || o.inicio) - parse(o.inicio)) / 864e5 + 1;
+  const dec = (parse(hoje()) - parse(o.inicio)) / 864e5 + 1;
+  return Math.max(0, Math.min(100, Math.round(dec / tot * 100)));
+}
+function situacaoPrazo(o) {
+  if (o.status === 'Concluída') return '';
+  const h = hoje();
+  if (o.inicio > h) { const d = Math.round((parse(o.inicio) - parse(h)) / 864e5); return `começa em ${d} dia${d > 1 ? 's' : ''}`; }
+  if (o.fim < h) { const d = Math.round((parse(h) - parse(o.fim)) / 864e5); return `<span style="color:var(--danger)">atrasada ${d} dia${d > 1 ? 's' : ''}</span>`; }
+  const d = Math.round((parse(o.fim) - parse(h)) / 864e5);
+  return d === 0 ? 'termina hoje' : `faltam ${d} dia${d > 1 ? 's' : ''}`;
+}
+const recebidoObra = o => soma(db.receitas.filter(r => r.obraId === o.id));
+const gastoObra = o => soma(db.despesas.filter(d => d.obraId === o.id));
 
 const VIEWS = {};
 const POS = {};
 
 VIEWS.agenda = () => {
-  const primeiro = new Date(cal.y, cal.m, 1);
-  const ini = new Date(primeiro); ini.setDate(1 - ((primeiro.getDay() + 6) % 7));
-  let cells = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map(d => `<div class="dow">${d}</div>`).join('');
-  for (let i = 0; i < 42; i++) {
-    const d = new Date(ini); d.setDate(ini.getDate() + i);
-    const s = iso(d), obs = obrasNoDia(s);
-    cells += `<div class="day ${d.getMonth() !== cal.m ? 'out' : ''} ${s === hoje() ? 'today' : ''} ${s === cal.sel ? 'sel' : ''}" data-act="calSel" data-dia="${s}">
-      <span class="n">${d.getDate()}</span>
-      ${obs.slice(0, 3).map(o => `<div class="bar" style="background:${corObra(o)}" title="${esc(o.nome)}"></div>`).join('')}
-      ${obs.length > 3 ? `<span class="more">+${obs.length - 3}</span>` : ''}
-    </div>`;
-  }
-  const doDia = obrasNoDia(cal.sel);
-  const ativas = db.obras.filter(o => o.status !== 'Concluída').sort((a, b) => (a.inicio || '').localeCompare(b.inicio || ''));
-  const concluidas = db.obras.filter(o => o.status === 'Concluída');
-
+  const f = filtroObras.status;
+  const lista = db.obras
+    .filter(o => f === 'todas' || (f === 'ativas' ? o.status !== 'Concluída' : o.status === f))
+    .sort((a, b) => (a.status === 'Concluída') - (b.status === 'Concluída') || (a.inicio || '').localeCompare(b.inicio || ''));
+  const ativas = db.obras.filter(o => o.status !== 'Concluída');
+  const contratado = soma(ativas);
+  const aReceber = ativas.reduce((t, o) => t + Math.max(0, num(o.valor) - recebidoObra(o)), 0);
+  const cont = s => db.obras.filter(o => o.status === s).length;
+  const filtros = [['ativas', 'Ativas', ativas.length], ['Em andamento', 'Em andamento', cont('Em andamento')], ['Agendada', 'Agendadas', cont('Agendada')], ['Pausada', 'Pausadas', cont('Pausada')], ['Concluída', 'Concluídas', cont('Concluída')], ['todas', 'Todas', db.obras.length]];
   return `
-  <div class="card">
-    <div class="cal-head">
-      <button class="btn sec sm" data-act="calNav" data-d="-1">‹</button>
-      <h3>${MESES[cal.m]} ${cal.y}</h3>
-      <button class="btn sec sm" data-act="calNav" data-d="1">›</button>
-    </div>
-    <div class="cal">${cells}</div>
+  <div class="grid grid-3">
+    <div class="stat"><div class="label">Obras em andamento</div><div class="value">${cont('Em andamento')} <small class="muted" style="font-size:13px;font-weight:500">· ${cont('Agendada')} agendada(s)</small></div></div>
+    <div class="stat"><div class="label">Contratos ativos</div><div class="value">${money(contratado)}</div></div>
+    <div class="stat hl"><div class="label">A receber das obras</div><div class="value">${money(aReceber)}</div></div>
   </div>
 
-  <div class="section-head"><h2>Obras em ${br(cal.sel)}</h2><button class="btn" data-act="novaObra">+ Nova obra</button></div>
-  <div class="card">${doDia.length ? doDia.map(itemObra).join('') : '<div class="empty">Nenhuma obra neste dia</div>'}</div>
-
-  <div class="section-head"><h2>Obras ativas (${ativas.length})</h2></div>
-  <div class="card">${ativas.length ? ativas.map(itemObra).join('') : '<div class="empty">Cadastre a primeira obra</div>'}</div>
-
-  ${concluidas.length ? `<div class="section-head"><h2>Concluídas (${concluidas.length})</h2></div><div class="card">${concluidas.map(itemObra).join('')}</div>` : ''}
+  <div class="section-head"><h2>Obras</h2><button class="btn" data-act="novaObra">+ Nova obra</button></div>
+  <div class="card">
+    <div class="inline-filters" style="margin-bottom:6px">
+      <div><input id="buscaObra" placeholder="🔎 Buscar obra, cliente ou endereço…"></div>
+    </div>
+    <div class="chips">${filtros.map(([k, r, n]) => `<button type="button" class="chip ${f === k ? 'active' : ''}" data-act="filtroObra" data-s="${k}">${r} <b>${n}</b></button>`).join('')}</div>
+    ${lista.length ? lista.map(itemObra).join('') : `<div class="empty">${db.obras.length ? 'Nenhuma obra neste filtro' : 'Nenhuma obra cadastrada. Toque em “+ Nova obra”.'}</div>`}
+  </div>
 
   <div class="section-head"><h2>Clientes (${db.clientes.length})</h2><button class="btn sec" data-act="novoCliente">+ Cliente</button></div>
   <div class="card">${db.clientes.length ? db.clientes.map(c => `
     <div class="list-item">
-      <div class="info"><div class="title">${esc(c.nome)}</div><div class="sub">${esc(c.telefone)} ${c.endereco ? '· ' + esc(c.endereco) : ''}</div></div>
+      <div class="info"><div class="title">${esc(c.nome)}</div><div class="sub">${esc(c.telefone)} ${c.endereco ? '· ' + esc(c.endereco) : ''} · ${db.obras.filter(o => o.clienteId === c.id).length} obra(s)</div></div>
       ${c.telefone ? `<a class="btn wa sm" href="https://wa.me/${foneWa(c.telefone)}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
       <button class="btn ghost sm" data-act="editCliente" data-id="${c.id}">Editar</button>
     </div>`).join('') : '<div class="empty">Nenhum cliente cadastrado</div>'}</div>`;
 };
 
+POS.agenda = () => {
+  const b = document.getElementById('buscaObra');
+  b.addEventListener('input', () => {
+    const q = b.value.toLowerCase().trim();
+    document.querySelectorAll('[data-busca-obra]').forEach(el => (el.hidden = q && !el.dataset.buscaObra.includes(q)));
+  });
+};
+
 function itemObra(o) {
-  return `<div class="list-item">
-    <span class="dot" style="background:${corObra(o)}"></span>
-    <div class="info">
-      <div class="title">${esc(o.nome)}</div>
-      <div class="sub">${esc(nomeCliente(o.clienteId))} · ${br(o.inicio)} a ${br(o.fim || o.inicio)} (${duracao(o)})</div>
-      ${o.endereco ? `<div class="sub">📍 ${esc(o.endereco)}</div>` : ''}
+  const pr = progressoObra(o), rec = recebidoObra(o);
+  const busca = [o.nome, nomeCliente(o.clienteId), o.endereco].join(' ').toLowerCase();
+  return `<div class="obra-item" data-busca-obra="${esc(busca)}">
+    <div class="obra-top" data-act="verObra" data-id="${o.id}">
+      <div class="info">
+        <div class="title">${esc(o.nome)}</div>
+        <div class="sub">👤 ${esc(nomeCliente(o.clienteId))}${o.endereco ? ' · 📍 ' + esc(o.endereco) : ''}</div>
+        <div class="sub">📅 ${br(o.inicio)} a ${br(o.fim || o.inicio)} · ${duracao(o)}${situacaoPrazo(o) ? ' · ' + situacaoPrazo(o) : ''}</div>
+      </div>
+      <div class="obra-valor">${badgeStatus(o.status)}${o.valor ? `<div><div class="amount">${money(o.valor)}</div><div class="sub">recebido ${money(rec)}</div></div>` : ''}</div>
     </div>
-    <div style="text-align:right">${badgeStatus(o.status)}<div class="amount" style="margin-top:4px">${o.valor ? money(o.valor) : ''}</div></div>
-    <button class="btn ghost sm" data-act="editObra" data-id="${o.id}">Editar</button>
+    <div class="progress"><span style="width:${pr}%"></span></div>
+    <div class="row obra-btns">
+      <span class="sub muted obra-pct">${pr}% do prazo</span>
+      <select class="mini-select" data-change="statusObra" data-id="${o.id}">${optTxt(STATUS_OBRA, o.status)}</select>
+      <button class="btn ghost sm" data-act="verObra" data-id="${o.id}">Detalhes</button>
+      <button class="btn ghost sm" data-act="editObra" data-id="${o.id}">Editar</button>
+    </div>
   </div>`;
 }
 
-actions.calNav = d => { cal.m += Number(d.d); if (cal.m < 0) { cal.m = 11; cal.y--; } if (cal.m > 11) { cal.m = 0; cal.y++; } render(); };
-actions.calSel = d => { cal.sel = d.dia; render(); };
+actions.filtroObra = d => { filtroObras.status = d.s; render(); };
+
+actions.verObra = ({ id }) => {
+  const o = byId('obras', id); if (!o) return;
+  const cli = byId('clientes', o.clienteId) || {};
+  const recs = db.receitas.filter(r => r.obraId === id).sort((a, b) => b.data.localeCompare(a.data));
+  const desp = db.despesas.filter(d => d.obraId === id).sort((a, b) => b.data.localeCompare(a.data));
+  const orcs = db.orcamentos.filter(x => x.obraId === id);
+  const rec = soma(recs), gas = soma(desp);
+  abrirModal(o.nome, `
+    <div class="row" style="margin:6px 0">${badgeStatus(o.status)} <span class="muted">${duracao(o)} · ${br(o.inicio)} a ${br(o.fim)}</span></div>
+    <div class="progress" style="margin:8px 0 4px"><span style="width:${progressoObra(o)}%"></span></div>
+    <div class="sub muted">${progressoObra(o)}% do prazo ${situacaoPrazo(o) ? '· ' + situacaoPrazo(o) : ''}</div>
+    <div class="list-item"><div class="info sub">Cliente</div><div>${esc(cli.nome || '—')}</div></div>
+    ${o.endereco ? `<div class="list-item"><div class="info sub">Endereço</div><div>${esc(o.endereco)}</div></div>` : ''}
+    ${o.obs ? `<div class="list-item"><div class="info sub">Observações</div><div>${esc(o.obs)}</div></div>` : ''}
+    <div class="grid grid-2" style="margin-top:10px">
+      <div class="stat"><div class="label">Contrato</div><div class="value">${money(o.valor)}</div><div class="sub muted">recebido ${money(rec)} · falta ${money(Math.max(0, num(o.valor) - rec))}</div></div>
+      <div class="stat"><div class="label">Gastos lançados na obra</div><div class="value">${money(gas)}</div><div class="sub muted">resultado ${money(rec - gas)}</div></div>
+    </div>
+    <h4 style="margin:16px 0 4px">Recebimentos (${recs.length})</h4>
+    ${recs.length ? recs.map(r => `<div class="list-item"><div class="info"><div class="title">${esc(r.descricao || 'Recebimento')}</div><div class="sub">${br(r.data)}${r.forma ? ' · ' + esc(r.forma) : ''}</div></div><div class="amount" style="color:var(--ok)">${money(r.valor)}</div></div>`).join('') : '<div class="sub muted">Nenhum recebimento.</div>'}
+    <h4 style="margin:16px 0 4px">Gastos (${desp.length})</h4>
+    ${desp.length ? desp.map(d => `<div class="list-item"><div class="info"><div class="title">${esc(d.descricao || d.categoria)}</div><div class="sub">${br(d.data)} · ${esc(d.categoria)}</div></div><div class="amount" style="color:var(--danger)">${money(d.valor)}</div></div>`).join('') : '<div class="sub muted">Nenhum gasto lançado.</div>'}
+    ${orcs.length ? `<h4 style="margin:16px 0 4px">Orçamentos</h4>${orcs.map(x => `<div class="list-item"><div class="info"><div class="title">Nº ${x.numero}</div><div class="sub">${br(x.data)} · ${esc(x.status || 'Pendente')}</div></div><div class="amount">${money(totalOrc(x))}</div></div>`).join('')}` : ''}
+    <div class="row" style="margin-top:14px">
+      <button type="button" class="btn" data-act="novaReceita" data-obra="${id}">+ Recebimento</button>
+      <button type="button" class="btn sec" data-act="novaDespesa" data-obra="${id}">+ Gasto</button>
+      <button type="button" class="btn ghost" data-act="editObra" data-id="${id}">Editar obra</button>
+      ${cli.telefone ? `<a class="btn wa" href="https://wa.me/${foneWa(cli.telefone)}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
+    </div>`, null);
+};
 
 function formCliente(c = {}) {
   return `<label>Nome *</label><input name="nome" required value="${esc(c.nome)}">
@@ -265,8 +318,8 @@ function formObra(o = {}) {
     <label>Cliente *</label><select name="clienteId" required>${opt(db.clientes, o.clienteId, 'Selecione…')}</select>
     <label>Endereço da obra</label><input name="endereco" value="${esc(o.endereco)}">
     <div class="grid grid-2">
-      <div><label>Início *</label><input type="date" name="inicio" required value="${o.inicio || cal.sel}"></div>
-      <div><label>Término previsto *</label><input type="date" name="fim" required value="${o.fim || o.inicio || cal.sel}"></div>
+      <div><label>Início *</label><input type="date" name="inicio" required value="${o.inicio || hoje()}"></div>
+      <div><label>Término previsto *</label><input type="date" name="fim" required value="${o.fim || o.inicio || hoje()}"></div>
     </div>
     <div class="grid grid-2">
       <div><label>Status</label><select name="status">${optTxt(STATUS_OBRA, o.status || 'Agendada')}</select></div>
@@ -281,7 +334,7 @@ function validarObra(d) {
 }
 actions.novaObra = () => abrirModal('Nova obra', formObra(), db.clientes.length ? d => {
   if (!validarObra(d)) return false;
-  db.obras.push({ id: uid(), ...d }); toast('Obra agendada');
+  db.obras.push({ id: uid(), ...d }); toast('Obra cadastrada');
 } : null);
 actions.editObra = ({ id }) => {
   const o = byId('obras', id);
@@ -381,7 +434,7 @@ function formReceita(r = {}) {
     <label>Obra (opcional)</label><select name="obraId">${opt(db.obras, r.obraId, 'Sem obra vinculada')}</select>
     <label>Forma de pagamento</label><select name="forma">${optTxt(['PIX', 'Dinheiro', 'Transferência', 'Cartão', 'Boleto', 'Cheque'], r.forma || 'PIX')}</select>`;
 }
-actions.novaReceita = () => abrirModal('Lançar recebimento', formReceita(), d => { d.valor = num(d.valor); db.receitas.push({ id: uid(), ...d }); toast('Recebimento lançado'); });
+actions.novaReceita = (d = {}) => abrirModal('Lançar recebimento', formReceita({ obraId: d.obra }), d => { d.valor = num(d.valor); db.receitas.push({ id: uid(), ...d }); toast('Recebimento lançado'); });
 actions.editReceita = ({ id }) => {
   const r = byId('receitas', id);
   abrirModal('Editar recebimento', formReceita(r) + `<div class="row" style="margin-top:12px"><button type="button" class="btn danger sm" data-act="delReg" data-lista="receitas" data-id="${id}">Excluir</button></div>`, d => { d.valor = num(d.valor); Object.assign(r, d); });
@@ -447,6 +500,7 @@ document.addEventListener('change', e => {
   if (el.dataset.change && changeActions[el.dataset.change]) changeActions[el.dataset.change](el);
 });
 const changeActions = {};
+changeActions.statusObra = el => { const o = byId('obras', el.dataset.id); o.status = el.value; salvar(); render(); toast(`Status da obra: ${el.value}`); };
 
 function formVale(v = {}) {
   if (!db.funcionarios.length || !db.postos.length) {
@@ -1144,7 +1198,7 @@ function formDespesa(d = {}) {
     <label>Categoria</label><select name="categoria">${optTxt(CATEGORIAS_GASTO, d.categoria || 'Material')}</select>
     <label>Obra (opcional)</label><select name="obraId">${opt(db.obras, d.obraId, 'Geral / sem obra')}</select>`;
 }
-actions.novaDespesa = () => abrirModal('Lançar despesa', formDespesa(), d => { d.valor = num(d.valor); db.despesas.push({ id: uid(), ...d }); toast('Despesa lançada'); });
+actions.novaDespesa = (d = {}) => abrirModal('Lançar despesa', formDespesa({ obraId: d.obra }), d => { d.valor = num(d.valor); db.despesas.push({ id: uid(), ...d }); toast('Despesa lançada'); });
 actions.editDespesa = ({ id }) => {
   const x = byId('despesas', id);
   abrirModal('Editar despesa', formDespesa(x) + `<div class="row" style="margin-top:12px"><button type="button" class="btn danger sm" data-act="delReg" data-lista="despesas" data-id="${id}">Excluir</button></div>`, d => { d.valor = num(d.valor); Object.assign(x, d); });

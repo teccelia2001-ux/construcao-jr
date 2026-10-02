@@ -8,7 +8,7 @@ App web (funciona no celular e no computador, inclusive offline) para a gestão 
 
 | Aba | O que faz |
 |---|---|
-| 📅 **Agenda** | Cadastro de clientes e obras (início, término, duração, status, valor) em um calendário mensal |
+| 🏗️ **Obras** | Lista de obras com busca e filtros por status, andamento pelo prazo (dias que faltam ou de atraso), troca rápida de status e ficha da obra com contrato, recebimentos, gastos e orçamentos. Também tem o cadastro de clientes |
 | 💰 **Faturamento** | Recebimentos com totais da semana, do mês e do ano e gráficos por semana, mês (com os gastos ao lado) e ano |
 | ⛽ **Combustível** | Vales para os colaboradores (colaborador, posto e valor). O vale é **adiantamento de salário** e é descontado automaticamente no pagamento. Gera o vale em PDF para assinar e o relatório do período |
 | 🧾 **Orçamentos** | Itens pré-cadastrados (tijolo, cimento, areia…), em que você só preenche a quantidade. Valor por item, itens/serviços avulsos, desconto, PDF para enviar ao cliente pelo WhatsApp |
