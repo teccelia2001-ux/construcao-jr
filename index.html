@@ -14,17 +14,16 @@
   <link rel="manifest" href="manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=1.5.0">
+  <link rel="stylesheet" href="styles.css?v=1.5.1">
 </head>
 <body>
   <div class="splash" id="splash"><img src="img/logo.jpg" alt="JR Construções — Sua obra em boas mãos"></div>
   <header class="topbar">
-    <div class="brand">
-      <img class="logo" src="img/logo-marca.jpg" alt="JR Construções">
-      <div>
-        <h1 id="empresaNome">JR Construções</h1>
-        <small id="hojeLabel"></small> <span class="ver" id="verLabel" data-act="goTab" data-tab="config"></span>
-      </div>
+    <img class="logo" src="img/logo-topo.jpg" alt="JR Construções — Sua obra em boas mãos">
+    <h1 id="empresaNome" class="sr-only">JR Construções</h1>
+    <div class="top-info">
+      <small id="hojeLabel"></small>
+      <span class="ver" id="verLabel" data-act="goTab" data-tab="config"></span>
     </div>
     <button class="icon-btn" data-act="goTab" data-tab="config" title="Configurações">⚙️</button>
   </header>
@@ -62,6 +61,6 @@
   <script src="vendor/chart.umd.min.js"></script>
   <script src="vendor/jspdf.umd.min.js"></script>
   <script src="vendor/jspdf.plugin.autotable.min.js"></script>
-  <script src="app.js?v=1.5.0"></script>
+  <script src="app.js?v=1.5.1"></script>
 </body>
 </html>
