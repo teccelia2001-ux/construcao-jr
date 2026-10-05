@@ -2,7 +2,7 @@
 
 > Sua obra em boas mãos
 
-App web (funciona no celular e no computador, inclusive offline) para a gestão da construtora. Os dados ficam salvos no próprio aparelho, com backup e restauração em arquivo na tela ⚙️.
+App web (funciona no celular e no computador, inclusive offline) para a gestão da construtora. Os dados ficam no banco (Supabase) e o acesso é por e-mail e senha, com dois níveis: **administrador** (lança e altera) e **leitor** (só consulta). Veja `supabase/banco.sql` para montar o banco.
 
 ## Abas
 

@@ -1,10 +1,10 @@
-/* Construtora JR — app de gestão (dados salvos no próprio aparelho) */
+/* Construtora JR — app de gestão (dados no banco Supabase, com login) */
 'use strict';
 
 // ---------- Dados ----------
 const KEY = 'construtora-jr-v1';
 // Versão do app — ao publicar mudanças, aumente aqui, no version.json e nos ?v= do index.html
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '1.8.0';
 
 const CATALOGO_PADRAO = [
   ['material', 'Tijolo 8 furos', 'milheiro', 900],
@@ -66,18 +66,67 @@ function migrar(dados) {
   return d;
 }
 
-function carregar() {
+// Dados antigos (guardados só neste aparelho) — usados uma vez para subir ao banco
+function dadosLocaisAntigos() {
   try {
     const salvo = JSON.parse(localStorage.getItem(KEY));
-    if (salvo) return migrar(salvo);
+    if (salvo && Array.isArray(salvo.obras)) return salvo;
   } catch (e) { /* ignora */ }
-  return estadoInicial();
+  return null;
 }
 
-let db = carregar();
+// ---------- Banco (Supabase) ----------
+const SB = window.JR_SUPABASE || {};
+const sb = SB.url && SB.anonKey && window.supabase ? window.supabase.createClient(SB.url, SB.anonKey) : null;
+let usuario = null;          // { id, email, papel: 'admin' | 'leitor' }
+let versaoBanco = 0;         // versão da linha que este aparelho conhece
+let db = estadoInicial();
+const ehAdmin = () => usuario?.papel === 'admin';
+
+let enviando = false, pendente = false, tempoEnvio = null;
+// Guarda no banco. Chamado após cada alteração; junta várias em um envio só.
 function salvar() {
-  try { localStorage.setItem(KEY, JSON.stringify(db)); }
-  catch (e) { toast('Não foi possível salvar no aparelho'); }
+  if (!ehAdmin()) { recarregarDoBanco(true); return; }
+  clearTimeout(tempoEnvio);
+  tempoEnvio = setTimeout(enviar, 400);
+}
+async function enviar() {
+  if (enviando) { pendente = true; return; }
+  enviando = true; pendente = false;
+  try {
+    const { data, error } = await sb.from('jr_dados')
+      .update({ dados: db, versao: versaoBanco + 1, atualizado_em: new Date().toISOString(), atualizado_por: usuario.id })
+      .eq('id', 1).eq('versao', versaoBanco).select('versao');
+    if (error) throw error;
+    if (!data.length) { // outra pessoa salvou antes
+      await recarregarDoBanco(false);
+      alert('Outra pessoa alterou os dados ao mesmo tempo. O app carregou a versão mais recente — confira e refaça sua última alteração, se faltar.');
+    } else versaoBanco = data[0].versao;
+  } catch (e) { toast('Não foi possível salvar. Verifique a internet.'); pendente = false; }
+  enviando = false;
+  if (pendente) enviar();
+}
+async function recarregarDoBanco(avisarLeitor) {
+  const { data, error } = await sb.from('jr_dados').select('dados,versao').eq('id', 1).maybeSingle();
+  if (error || !data) return false;
+  db = migrar(data.dados); versaoBanco = data.versao;
+  if (cidadeAtual && !db.config.cidades.includes(cidadeAtual)) cidadeAtual = db.config.cidades[0];
+  render();
+  if (avisarLeitor) toast('Seu acesso é somente leitura');
+  return true;
+}
+// Lê o banco no início; se estiver vazio, o administrador sobe os dados que já estavam no aparelho
+async function carregarBanco() {
+  const { data, error } = await sb.from('jr_dados').select('dados,versao').eq('id', 1).maybeSingle();
+  if (error) throw error;
+  if (data) { db = migrar(data.dados); versaoBanco = data.versao; return; }
+  if (!ehAdmin()) { db = estadoInicial(); versaoBanco = 0; return; }
+  const antigo = dadosLocaisAntigos();
+  db = antigo ? migrar(antigo) : estadoInicial();
+  const { error: e2 } = await sb.from('jr_dados').insert({ id: 1, dados: db, versao: 1, atualizado_por: usuario.id });
+  if (e2) throw e2;
+  versaoBanco = 1;
+  if (antigo) setTimeout(() => toast('Seus dados deste aparelho foram lançados no banco ✔'), 1500);
 }
 
 // ---------- Utilidades ----------
@@ -198,9 +247,14 @@ const actions = {
   goTab: d => { aba = d.tab; orcEdit = null; try { localStorage.setItem(KEY + ':aba', aba); } catch (e) { /* ignora */ } render(); window.scrollTo(0, 0); },
   closeModal: () => fecharModal(),
 };
+// Ações que o leitor pode usar (consultar, filtrar, gerar PDF). O resto é só do administrador.
+const ACOES_LEITOR = new Set(['goTab', 'closeModal', 'abrirCidade', 'filtroObra', 'fatAno', 'setPeriodo', 'pagTipo', 'equipeStatus',
+  'verObra', 'verFunc', 'verCatalogo', 'pdfCidades', 'pdfFolha', 'pdfGastos', 'pdfVale', 'pdfVales', 'enviarOrc', 'copiarLink',
+  'instalarApp', 'fecharInstalar', 'verificarAtualizacao', 'atualizarApp', 'sair']);
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]');
   if (!el) return;
+  if (usuario && !ehAdmin() && !ACOES_LEITOR.has(el.dataset.act)) { e.preventDefault(); toast('Seu acesso é somente leitura'); return; }
   const fn = actions[el.dataset.act];
   if (fn) { e.preventDefault(); fn(el.dataset, el); }
 });
@@ -1556,13 +1610,11 @@ VIEWS.config = () => `
   <div class="card">${db.config.cidades.map(c => `<div class="list-item"><div class="info"><div class="title">📍 ${esc(c)}</div><div class="sub">${usoCidade(c)} registro(s)</div></div>
     <button class="btn ghost sm" data-act="abrirCidade" data-c="${esc(c)}">Abrir</button></div>`).join('')}</div>
 
-  <div class="section-head"><h2>Backup dos dados</h2></div>
+  <div class="section-head"><h2>Minha conta</h2></div>
   <div class="card">
-    <p class="muted mt0" style="font-size:13px">Os dados ficam salvos neste aparelho. Faça backup com frequência e use o arquivo para passar os dados para outro celular ou computador.</p>
-    <div class="row">
-      <button class="btn" data-act="exportar">⬇️ Baixar backup</button>
-      <label class="btn sec" style="margin:0">⬆️ Restaurar backup<input type="file" accept="application/json,.json" id="importFile" hidden></label>
-    </div>
+    <div class="list-item"><div class="info"><div class="title">${esc(usuario?.email || '')}</div><div class="sub">${ehAdmin() ? 'Administrador — pode lançar e alterar' : 'Leitor — só consulta'}</div></div>
+    <button class="btn sec sm" data-act="sair">Sair</button></div>
+    <p class="muted" style="font-size:13px;margin-bottom:0">Os dados ficam guardados no banco e aparecem iguais em qualquer aparelho em que você entrar com seu e-mail e senha.</p>
   </div>
   <div class="section-head"><h2>Acesso pelo celular</h2></div>
   <div class="card">
@@ -1581,33 +1633,18 @@ VIEWS.config = () => `
     </div>
   </div>
 
-  <div class="row"><button class="btn danger" data-act="zerar">Apagar todos os dados</button></div>`;
+  ${ehAdmin() ? '<div class="row"><button class="btn danger" data-act="zerar">Apagar todos os dados</button></div>' : ''}`;
 
 POS.config = () => {
   verificarVersao();
   document.getElementById('cfgForm').addEventListener('submit', e => {
     e.preventDefault();
+    if (!ehAdmin()) return toast('Seu acesso é somente leitura');
     Object.assign(db.config, Object.fromEntries(new FormData(e.target).entries()));
     salvar(); render(); toast('Dados salvos');
   });
-  document.getElementById('importFile').addEventListener('change', async e => {
-    const f = e.target.files[0]; if (!f) return;
-    try {
-      const dados = JSON.parse(await f.text());
-      if (!dados || !Array.isArray(dados.obras)) throw new Error('arquivo inválido');
-      if (!confirm('Substituir todos os dados atuais pelos do backup?')) return;
-      db = migrar(dados);
-      if (cidadeAtual && !db.config.cidades.includes(cidadeAtual)) cidadeAtual = db.config.cidades[0];
-      salvar(); render(); toast('Backup restaurado');
-    } catch (err) { alert('Arquivo de backup inválido.'); }
-  });
 };
-actions.exportar = () => {
-  const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = `backup-construtora-jr-${hoje()}.json`; a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-};
+actions.sair = async () => { if (sb) await sb.auth.signOut(); location.reload(); };
 actions.zerar = () => {
   if (!confirm('Apagar TODOS os dados? Esta ação não pode ser desfeita.')) return;
   if (prompt('Digite APAGAR para confirmar') !== 'APAGAR') return;
@@ -1753,9 +1790,49 @@ actions.instalarApp = async () => {
 
 const ajustarTopo = () => document.documentElement.style.setProperty('--topbar-h', document.querySelector('.topbar').offsetHeight + 'px');
 window.addEventListener('resize', ajustarTopo);
-render();
 ajustarTopo();
 setTimeout(() => { const sp = document.getElementById('splash'); if (sp) { sp.classList.add('out'); setTimeout(() => sp.remove(), 600); } }, 1100);
 verificarVersao();
 setInterval(verificarVersao, 30 * 60 * 1000);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) verificarVersao(); });
+
+// =====================================================
+// LOGIN E INÍCIO
+// =====================================================
+const telaLogin = document.getElementById('login');
+function mostrarLogin(msg) {
+  document.body.classList.add('sem-login');
+  telaLogin.hidden = false;
+  document.getElementById('loginErro').textContent = msg || '';
+}
+function esconderLogin() { telaLogin.hidden = true; document.body.classList.remove('sem-login'); }
+
+async function entrar(sessao) {
+  const { data: perfil, error } = await sb.from('jr_perfis').select('papel,email').eq('user_id', sessao.user.id).maybeSingle();
+  if (error || !perfil) { await sb.auth.signOut(); return mostrarLogin('Este e-mail não tem acesso ao app. Peça ao administrador.'); }
+  usuario = { id: sessao.user.id, email: perfil.email || sessao.user.email, papel: perfil.papel };
+  try { await carregarBanco(); }
+  catch (e) { return mostrarLogin('Não foi possível ler os dados. Verifique a internet e tente de novo.'); }
+  document.body.classList.toggle('leitor', !ehAdmin());
+  if (cidadeAtual && !db.config.cidades.includes(cidadeAtual)) cidadeAtual = db.config.cidades[0];
+  esconderLogin();
+  render();
+  setInterval(() => { if (!document.hidden && !enviando && !tempoEnvio) recarregarDoBanco(false); }, 60 * 1000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !enviando) recarregarDoBanco(false); });
+}
+
+document.getElementById('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const f = new FormData(e.target), btn = e.target.querySelector('button');
+  btn.disabled = true; document.getElementById('loginErro').textContent = '';
+  const { data, error } = await sb.auth.signInWithPassword({ email: String(f.get('email')).trim(), password: String(f.get('senha')) });
+  btn.disabled = false;
+  if (error) return (document.getElementById('loginErro').textContent = 'E-mail ou senha incorretos.');
+  e.target.reset();
+  entrar(data.session);
+});
+
+(async function iniciar() {
+  if (!sb) return mostrarLogin('O app ainda não foi ligado ao banco de dados (faltam os dados do Supabase em supabase-config.js).');
+  const { data } = await sb.auth.getSession();
+  if (data.session) entrar(data.session); else mostrarLogin();
+})();

@@ -360,3 +360,13 @@ td.num, th.num, tfoot td { white-space: nowrap; }
 @media (max-width: 560px) { .install-btn { display: none; } }
 /* aberto como aplicativo (sem barra do navegador) */
 @media (display-mode: standalone) { .install-btn, .install-bar { display: none !important; } }
+
+/* ---- Login ---- */
+.login { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--bg, #061a2e); overflow: auto; }
+.login[hidden] { display: none; }
+.login-card { width: 100%; max-width: 360px; background: var(--card, #0d2742); border: 1px solid var(--border, #1e3a5f); border-radius: 18px; padding: 22px; }
+.login-card img { display: block; max-width: 220px; width: 70%; margin: 0 auto 10px; border-radius: 10px; }
+.login-card h2 { text-align: center; margin: 4px 0 8px; }
+.login-card .btn { width: 100%; margin-top: 12px; }
+.login-erro { color: var(--danger, #f87171); font-size: 13.5px; min-height: 18px; margin: 8px 0 0; }
+body.sem-login .topbar, body.sem-login .tabs, body.sem-login main { visibility: hidden; }
