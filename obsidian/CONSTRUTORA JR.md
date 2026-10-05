@@ -3,7 +3,7 @@ projeto: CONSTRUTORA JR
 empresa: JR Construções
 slogan: Sua obra em boas mãos
 status: em uso
-versao: 1.7.0
+versao: 1.8.0
 atualizado: 2026-10-05
 link: https://teccelia2001-ux.github.io/construcao-jr/
 repositorio: https://github.com/teccelia2001-ux/construcao-jr
@@ -19,7 +19,8 @@ tags:
 > [!info] Acesso
 > - **Link do app:** https://teccelia2001-ux.github.io/construcao-jr/
 > - **Código (GitHub):** https://github.com/teccelia2001-ux/construcao-jr
-> - **Versão atual:** `v1.7.0` (2026-10-05)
+> - **Versão atual:** `v1.8.0` (2026-10-05)
+> - **Banco de dados:** Supabase. Entrada com **e-mail e senha**.
 > - Funciona no **celular, tablet e computador**, e também **offline**.
 
 ## 📋 Solicitação original
@@ -39,6 +40,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 - [x] **Empreitada:** obras pequenas.
 - [x] Mesmo visual ("skin") do app Agenda do Salão. Depois foi trocado pela **identidade azul da JR Construções**.
 - [x] **Informações por cidade** (ex.: Lavras da Mangabeira) e uma aba que **soma todas as cidades**.
+- [x] **Dados na nuvem (Supabase)** com login por e-mail e senha, nos níveis **administrador** e **leitor**.
 
 ## 🗂️ Abas do app
 
@@ -53,7 +55,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 | 💵 **Pagamentos** | Relatório da 1ª quinzena, 2ª quinzena ou do mês, com bruto, vales, valor a pagar e PDF |
 | 📉 **Gastos** | Semana, quinzena e mês: mão de obra mais despesas, comparados com o faturamento |
 | 🔨 **Empreitada** | Serviços pequenos: valor, prazo, responsável e recebimentos |
-| ⚙️ **Configurações** | Dados da empresa, cidades, backup e restauração, link, instalar app e versão |
+| ⚙️ **Configurações** | Dados da empresa, cidades, link, instalar app e versão |
 
 ## 📍 Cidades
 
@@ -62,6 +64,19 @@ Criar um app para a construtora com **uma aba para cada item**:
 - Para cadastrar, renomear ou excluir cidades: **➕ Adicionar / editar cidades…** no seletor, ou ⚙️ → Cidades.
 - Recebimentos e gastos de uma obra seguem a cidade da obra. Vales e faltas seguem a cidade do funcionário, e o orçamento a cidade do cliente.
 - Os dados de antes das cidades foram para **Lavras da Mangabeira**. Para mudar um registro de cidade, use o **Editar** dele.
+
+## 🔐 Login e banco de dados (Supabase)
+
+- Os dados ficam no **Supabase**, num banco na nuvem. Assim celular e computador mostram as mesmas informações.
+- Para entrar, use o **e-mail e a senha** cadastrados no Supabase. O acesso é criado pelo administrador.
+- Há dois níveis de acesso:
+  - **Administrador:** lança, altera e exclui.
+  - **Leitor:** só consulta.
+- O **primeiro usuário cadastrado vira administrador**. Os seguintes entram como leitor.
+- Para trocar o nível de alguém, rode isto no SQL Editor do Supabase:
+  `update public.jr_perfis set papel = 'admin' where email = 'fulano@exemplo.com';`
+- A estrutura do banco está no arquivo `supabase/banco.sql`. O endereço do projeto e a chave pública estão em `supabase-config.js`.
+- O **backup em arquivo foi retirado**, porque os dados já ficam guardados no banco.
 
 ## 📏 Regras de negócio
 
@@ -77,9 +92,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 - **PDFs:**
   - **No celular:** abre o compartilhamento do sistema para mandar pelo WhatsApp.
   - **No computador:** o arquivo é baixado direto na pasta Downloads.
-- **Dados:**
-  - Ficam salvos **no próprio aparelho**.
-  - Para passar os dados para outro aparelho, use ⚙️ → **Exportar backup** e depois **Importar**.
+- **Dados:** ficam no **Supabase**. Qualquer aparelho com login vê as mesmas informações.
 
 ## 📲 Instalar como aplicativo (sem a barra do navegador)
 
@@ -117,6 +130,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 | 1.5.1 | Logo completa no topo |
 | 1.6.0 | Responsivo para qualquer tela e instalação como aplicativo |
 | 1.7.0 | Informações por cidade (seletor 📍 no topo) e aba **Todas as cidades** |
+| 1.8.0 | Dados no **Supabase**, login por e-mail e senha (administrador e leitor), sem backup em arquivo |
 
 ## 📌 Pendências e ideias
 
@@ -124,7 +138,7 @@ Criar um app para a construtora com **uma aba para cada item**:
   - [ ] **Domínio próprio**, por exemplo `construtorajr.com.br`. Custa cerca de R$ 40 por ano no registro.br. Exige configurar o DNS e o GitHub Pages.
   - [ ] **Link curto grátis**, por exemplo `tinyurl.com/construtorajr`. Ele só redireciona para o link longo.
   - [ ] **Usar só o app instalado.** Assim não aparece endereço nenhum. Dá para mudar o nome do ícone para "CONSTRUTORA JR".
-  - ⚠️ Se mudar de endereço, faça antes **Exportar backup** e depois **Importar** no novo endereço, porque os dados ficam presos ao endereço antigo.
+  - Agora que os dados estão no Supabase, mudar de endereço **não perde dados**. Basta entrar de novo com o login.
 
 ## 🧩 Estrutura técnica
 
@@ -137,5 +151,7 @@ Criar um app para a construtora com **uma aba para cada item**:
   - `sw.js`: modo offline.
   - `version.json`: número da versão publicada.
   - `img/`: logo e ícones.
-  - `vendor/`: bibliotecas de gráficos e PDF.
-- Os dados ficam no navegador (`localStorage`), na chave `construtora-jr-v1`.
+  - `vendor/`: bibliotecas de gráficos, PDF e Supabase.
+  - `supabase-config.js`: endereço do projeto e chave pública do Supabase.
+  - `supabase/banco.sql`: estrutura do banco e regras de acesso.
+- Os dados ficam no **Supabase**.
