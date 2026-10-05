@@ -126,6 +126,22 @@ Criar um app para a construtora com **uma aba para cada item**:
   - [ ] **Usar só o app instalado.** Assim não aparece endereço nenhum. Dá para mudar o nome do ícone para "CONSTRUTORA JR".
   - ⚠️ Se mudar de endereço, faça antes **Exportar backup** e depois **Importar** no novo endereço, porque os dados ficam presos ao endereço antigo.
 
+## 🤖 Claude (quem programa o app)
+
+> [!tip] Como pedir uma mudança
+> Abra o **Claude Code** (claude.ai/code) no repositório `construcao-jr` e escreva o pedido em português, do jeito que falaria com uma pessoa. Ex.: *"Na aba Gastos, mostrar também o total do ano"*.
+
+- **Branch publicado (o link do app):** `claude/happy-gauss-jjrtqt`. Só o que está nele aparece no celular.
+- Cada sessão nova do Claude pode trabalhar em **outro branch** (ex.: `claude/nice-dirac-z3bx1f`). Para a mudança chegar ao app, peça: *"Juntar no branch claude/happy-gauss-jjrtqt"*.
+- **O que o Claude deve fazer a cada versão nova:**
+  - [ ] Aumentar a versão nos três lugares: `APP_VERSION` no `app.js`, `version.json` e os `?v=` do `index.html`.
+  - [ ] Atualizar o `README.md`.
+  - [ ] Atualizar esta nota: versão, abas, regras e o **Histórico de versões**.
+  - [ ] Enviar para o GitHub.
+- **Sessões do Claude no projeto:**
+  - [Sessão 1: app, cidades e nota do Obsidian](https://claude.ai/code/session_01QEUz4CRegPQeh3E37n9JDN)
+  - [Sessão 2: seção do Claude nesta nota](https://claude.ai/code/session_01HB5g8hTCCjQNWwWXcTXjLj)
+
 ## 🧩 Estrutura técnica
 
 - App web estático (HTML, CSS e JavaScript), publicado no **GitHub Pages**.
