@@ -38,6 +38,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 - [x] **Gastos** do mês, da semana e da quinzena.
 - [x] **Empreitada:** obras pequenas.
 - [x] Mesmo visual ("skin") do app Agenda do Salão. Depois foi trocado pela **identidade azul da JR Construções**.
+- [x] **Informações por cidade** (ex.: Lavras da Mangabeira) e uma aba que **soma todas as cidades**.
 
 ## 🗂️ Abas do app
 
@@ -52,7 +53,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 | 💵 **Pagamentos** | Relatório da 1ª quinzena, 2ª quinzena ou do mês, com bruto, vales, valor a pagar e PDF |
 | 📉 **Gastos** | Semana, quinzena e mês: mão de obra mais despesas, comparados com o faturamento |
 | 🔨 **Empreitada** | Serviços pequenos: valor, prazo, responsável e recebimentos |
-| ⚙️ **Configurações** | Dados da empresa, backup e restauração, link, instalar app e versão |
+| ⚙️ **Configurações** | Dados da empresa, cidades, backup e restauração, link, instalar app e versão |
 
 ## 📍 Cidades
 
@@ -60,6 +61,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 - A opção **🌎 Todas as cidades** soma tudo. A aba **Todas as cidades** mostra o resumo e a comparação de cada cidade.
 - Para cadastrar, renomear ou excluir cidades: **➕ Adicionar / editar cidades…** no seletor, ou ⚙️ → Cidades.
 - Recebimentos e gastos de uma obra seguem a cidade da obra. Vales e faltas seguem a cidade do funcionário, e o orçamento a cidade do cliente.
+- Os dados de antes das cidades foram para **Lavras da Mangabeira**. Para mudar um registro de cidade, use o **Editar** dele.
 
 ## 📏 Regras de negócio
 
