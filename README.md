@@ -8,6 +8,7 @@ App web (funciona no celular e no computador, inclusive offline) para a gestão 
 
 | Aba | O que faz |
 |---|---|
+| 🌎 **Todas as cidades** | Soma todas as cidades: faturamento, gastos, saldo, a receber, obras e funcionários, com um card por cidade, gráfico comparativo, tabela e PDF (semana, quinzena, mês ou ano) |
 | 🏗️ **Obras** | Lista de obras com busca e filtros por status, andamento pelo prazo (dias que faltam ou de atraso), troca rápida de status e ficha da obra com contrato, recebimentos, gastos e orçamentos. Também tem o cadastro de clientes |
 | 💰 **Faturamento** | Recebimentos com totais da semana, do mês e do ano e gráficos por semana, mês (com os gastos ao lado) e ano |
 | ⛽ **Combustível** | Vales para os colaboradores (colaborador, posto e valor). O vale é **adiantamento de salário** e é descontado automaticamente no pagamento. Gera o vale em PDF para assinar e o relatório do período |
@@ -16,6 +17,15 @@ App web (funciona no celular e no computador, inclusive offline) para a gestão 
 | 💵 **Pagamentos** | Relatório **quinzenal (1ª/2ª)** ou **mensal**: dias trabalhados, faltas, valor bruto, vales descontados e valor a pagar, em PDF |
 | 📉 **Gastos** | Gastos da semana, quinzena e mês: mão de obra (diárias − faltas, com os vales já incluídos) + despesas lançadas, comparados com o faturamento |
 | 🔨 **Empreitada** | Obras pequenas: serviço, cliente, valor combinado, prazo, responsável e recebimentos, que entram no faturamento |
+
+## Cidades
+
+No topo do app fica o **📍 seletor de cidade** (ex.: *Lavras da Mangabeira*). Escolhida uma cidade, **todas as abas** mostram só o que é dela: obras, clientes, faturamento, vales, orçamentos, funcionários, pagamentos, gastos e empreitadas. A opção **🌎 Todas as cidades** soma tudo.
+
+- Para cadastrar, renomear ou excluir cidades, use **➕ Adicionar / editar cidades…** no seletor, ou ⚙️ → *Cidades*.
+- Um registro novo entra na cidade escolhida. Com *Todas as cidades*, o formulário pergunta a cidade.
+- Recebimentos e despesas de uma obra ficam na cidade da obra. Vales e faltas ficam na cidade do funcionário, e o orçamento na cidade do cliente.
+- Os dados antigos, de antes das cidades, foram colocados na primeira cidade (Lavras da Mangabeira). Dá para renomeá-la.
 
 ## Como usar
 

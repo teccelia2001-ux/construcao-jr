@@ -3,7 +3,7 @@ projeto: CONSTRUTORA JR
 empresa: JR Construções
 slogan: Sua obra em boas mãos
 status: em uso
-versao: 1.6.0
+versao: 1.7.0
 atualizado: 2026-10-05
 link: https://teccelia2001-ux.github.io/construcao-jr/
 repositorio: https://github.com/teccelia2001-ux/construcao-jr
@@ -19,7 +19,7 @@ tags:
 > [!info] Acesso
 > - **Link do app:** https://teccelia2001-ux.github.io/construcao-jr/
 > - **Código (GitHub):** https://github.com/teccelia2001-ux/construcao-jr
-> - **Versão atual:** `v1.6.0` (2026-10-02)
+> - **Versão atual:** `v1.7.0` (2026-10-05)
 > - Funciona no **celular, tablet e computador**, e também **offline**.
 
 ## 📋 Solicitação original
@@ -43,6 +43,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 
 | Aba | O que faz |
 |---|---|
+| 🌎 **Todas as cidades** | Soma todas as cidades: faturamento, gastos, saldo, a receber, comparativo e PDF |
 | 🏗️ **Obras** | Lista de obras com busca, filtro por status e andamento pelo prazo. Ficha da obra com recebimentos, gastos e orçamentos, mais o cadastro de clientes |
 | 💰 **Faturamento** | Recebimentos com totais da semana, do mês e do ano, e gráficos |
 | ⛽ **Combustível** | Vale (colaborador, posto, valor) **sem placa**, com PDF do vale e relatório |
@@ -52,6 +53,13 @@ Criar um app para a construtora com **uma aba para cada item**:
 | 📉 **Gastos** | Semana, quinzena e mês: mão de obra mais despesas, comparados com o faturamento |
 | 🔨 **Empreitada** | Serviços pequenos: valor, prazo, responsável e recebimentos |
 | ⚙️ **Configurações** | Dados da empresa, backup e restauração, link, instalar app e versão |
+
+## 📍 Cidades
+
+- No topo há o seletor **📍 Cidade** (ex.: Lavras da Mangabeira). A cidade escolhida filtra **todas as abas**.
+- A opção **🌎 Todas as cidades** soma tudo. A aba **Todas as cidades** mostra o resumo e a comparação de cada cidade.
+- Para cadastrar, renomear ou excluir cidades: **➕ Adicionar / editar cidades…** no seletor, ou ⚙️ → Cidades.
+- Recebimentos e gastos de uma obra seguem a cidade da obra. Vales e faltas seguem a cidade do funcionário, e o orçamento a cidade do cliente.
 
 ## 📏 Regras de negócio
 
@@ -106,6 +114,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 | 1.5.0 | Aba **Obras** no lugar do calendário |
 | 1.5.1 | Logo completa no topo |
 | 1.6.0 | Responsivo para qualquer tela e instalação como aplicativo |
+| 1.7.0 | Informações por cidade (seletor 📍 no topo) e aba **Todas as cidades** |
 
 ## 📌 Pendências e ideias
 

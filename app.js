@@ -4,7 +4,7 @@
 // ---------- Dados ----------
 const KEY = 'construtora-jr-v1';
 // Versão do app — ao publicar mudanças, aumente aqui, no version.json e nos ?v= do index.html
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.7.0';
 
 const CATALOGO_PADRAO = [
   ['material', 'Tijolo 8 furos', 'milheiro', 900],
@@ -40,22 +40,36 @@ function uid() { return Date.now().toString(36) + Math.random().toString(36).sli
 
 function estadoInicial() {
   return {
-    config: { empresa: 'JR Construções', telefone: '', cnpj: '', endereco: '', trabalhaSabado: true },
+    config: { empresa: 'JR Construções', telefone: '', cnpj: '', endereco: '', trabalhaSabado: true, cidades: ['Lavras da Mangabeira'] },
     clientes: [], obras: [], receitas: [], postos: [], vales: [],
     catalogo: CATALOGO_PADRAO.map(([tipo, nome, unidade, preco]) => ({ id: uid(), tipo, nome, unidade, preco })),
     orcamentos: [], funcionarios: [], faltas: [], despesas: [], empreitadas: [],
   };
 }
 
+// Listas que pertencem a uma cidade (as faltas seguem a cidade do funcionário; o catálogo é comum a todas)
+const LISTAS_CIDADE = ['clientes', 'obras', 'receitas', 'postos', 'vales', 'orcamentos', 'funcionarios', 'despesas', 'empreitadas'];
+
+// completa dados antigos ou de backup: cidades na config e cidade em cada registro
+function migrar(dados) {
+  const base = estadoInicial();
+  const cfg = { ...base.config, ...(dados.config || {}) };
+  if (cfg.empresa === 'Construtora JR') cfg.empresa = 'JR Construções'; // nome antigo padrão
+  cfg.cidades = [...new Set((Array.isArray(cfg.cidades) ? cfg.cidades : []).map(c => String(c).trim()).filter(Boolean))];
+  if (!cfg.cidades.length) cfg.cidades = [...base.config.cidades];
+  const d = { ...base, ...dados, config: cfg };
+  LISTAS_CIDADE.forEach(l => d[l].forEach(x => {
+    if (!x.cidade || !cfg.cidades.includes(x.cidade)) {
+      if (x.cidade) cfg.cidades.push(x.cidade); else x.cidade = cfg.cidades[0];
+    }
+  }));
+  return d;
+}
+
 function carregar() {
   try {
     const salvo = JSON.parse(localStorage.getItem(KEY));
-    if (salvo) {
-      const base = estadoInicial();
-      const cfg = { ...base.config, ...(salvo.config || {}) };
-      if (cfg.empresa === 'Construtora JR') cfg.empresa = 'JR Construções'; // nome antigo padrão
-      return { ...base, ...salvo, config: cfg };
-    }
+    if (salvo) return migrar(salvo);
   } catch (e) { /* ignora */ }
   return estadoInicial();
 }
@@ -94,6 +108,31 @@ function rangeAno(s) { const y = parse(s).getFullYear(); return [`${y}-01-01`, `
 const byId = (lista, id) => db[lista].find(x => x.id === id);
 const nomeCliente = id => byId('clientes', id)?.nome || '—';
 const soma = (arr, f = x => x.valor) => arr.reduce((t, x) => t + num(f(x)), 0);
+
+// ---------- Cidades ----------
+// cidadeAtual vazia = todas as cidades somadas
+let cidadeAtual = '';
+try { cidadeAtual = localStorage.getItem(KEY + ':cidade') ?? db.config.cidades[0]; } catch (e) { cidadeAtual = db.config.cidades[0]; }
+if (cidadeAtual && !db.config.cidades.includes(cidadeAtual)) cidadeAtual = db.config.cidades[0];
+
+const daCid = x => !cidadeAtual || x.cidade === cidadeAtual;
+// registros da cidade escolhida (ou de todas)
+function C(lista) {
+  if (lista === 'faltas') { const ids = new Set(C('funcionarios').map(f => f.id)); return db.faltas.filter(x => ids.has(x.funcionarioId)); }
+  return db[lista].filter(daCid);
+}
+// cidade para um registro novo
+const cidadeNova = () => cidadeAtual || db.config.cidades[0];
+// mostra a cidade do registro quando estão todas somadas
+const tagCid = x => !cidadeAtual && x?.cidade ? ` · 📍 ${esc(x.cidade)}` : '';
+// executa uma conta como se a cidade escolhida fosse outra (usado no resumo de todas as cidades)
+function comCidade(cid, fn) { const ant = cidadeAtual; cidadeAtual = cid; try { return fn(); } finally { cidadeAtual = ant; } }
+function campoCidade(reg = {}) {
+  const atual = reg.cidade || cidadeNova();
+  if (db.config.cidades.length === 1 && atual === db.config.cidades[0]) return `<input type="hidden" name="cidade" value="${esc(atual)}">`;
+  return `<label>Cidade *</label><select name="cidade" required>${optTxt(db.config.cidades, atual)}</select>`;
+}
+const nomeCidade = () => cidadeAtual || 'Todas as cidades';
 
 function foneWa(t) {
   let d = String(t || '').replace(/\D/g, '');
@@ -148,6 +187,8 @@ function render() {
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === aba));
   document.getElementById('empresaNome').textContent = db.config.empresa || 'JR Construções';
   document.getElementById('hojeLabel').textContent = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
+  document.getElementById('cidadeSel').innerHTML = db.config.cidades.map(c => `<option value="${esc(c)}" ${c === cidadeAtual ? 'selected' : ''}>${esc(c)}</option>`).join('') +
+    `<option value="" ${!cidadeAtual ? 'selected' : ''}>🌎 Todas as cidades</option><option value="__gerenciar">➕ Adicionar / editar cidades…</option>`;
   const v = document.getElementById('view');
   v.innerHTML = (VIEWS[aba] || VIEWS.agenda)();
   if (POS[aba]) POS[aba]();
@@ -200,14 +241,15 @@ const POS = {};
 
 VIEWS.agenda = () => {
   const f = filtroObras.status;
-  const lista = db.obras
+  const obras = C('obras'), clientes = C('clientes');
+  const lista = obras
     .filter(o => f === 'todas' || (f === 'ativas' ? o.status !== 'Concluída' : o.status === f))
     .sort((a, b) => (a.status === 'Concluída') - (b.status === 'Concluída') || (a.inicio || '').localeCompare(b.inicio || ''));
-  const ativas = db.obras.filter(o => o.status !== 'Concluída');
+  const ativas = obras.filter(o => o.status !== 'Concluída');
   const contratado = soma(ativas);
   const aReceber = ativas.reduce((t, o) => t + Math.max(0, num(o.valor) - recebidoObra(o)), 0);
-  const cont = s => db.obras.filter(o => o.status === s).length;
-  const filtros = [['ativas', 'Ativas', ativas.length], ['Em andamento', 'Em andamento', cont('Em andamento')], ['Agendada', 'Agendadas', cont('Agendada')], ['Pausada', 'Pausadas', cont('Pausada')], ['Concluída', 'Concluídas', cont('Concluída')], ['todas', 'Todas', db.obras.length]];
+  const cont = s => obras.filter(o => o.status === s).length;
+  const filtros = [['ativas', 'Ativas', ativas.length], ['Em andamento', 'Em andamento', cont('Em andamento')], ['Agendada', 'Agendadas', cont('Agendada')], ['Pausada', 'Pausadas', cont('Pausada')], ['Concluída', 'Concluídas', cont('Concluída')], ['todas', 'Todas', obras.length]];
   return `
   <div class="grid grid-3">
     <div class="stat"><div class="label">Obras em andamento</div><div class="value">${cont('Em andamento')} <small class="muted" style="font-size:13px;font-weight:500">· ${cont('Agendada')} agendada(s)</small></div></div>
@@ -221,13 +263,13 @@ VIEWS.agenda = () => {
       <div><input id="buscaObra" placeholder="🔎 Buscar obra, cliente ou endereço…"></div>
     </div>
     <div class="chips">${filtros.map(([k, r, n]) => `<button type="button" class="chip ${f === k ? 'active' : ''}" data-act="filtroObra" data-s="${k}">${r} <b>${n}</b></button>`).join('')}</div>
-    ${lista.length ? lista.map(itemObra).join('') : `<div class="empty">${db.obras.length ? 'Nenhuma obra neste filtro' : 'Nenhuma obra cadastrada. Toque em “+ Nova obra”.'}</div>`}
+    ${lista.length ? lista.map(itemObra).join('') : `<div class="empty">${obras.length ? 'Nenhuma obra neste filtro' : 'Nenhuma obra cadastrada. Toque em “+ Nova obra”.'}</div>`}
   </div>
 
-  <div class="section-head"><h2>Clientes (${db.clientes.length})</h2><button class="btn sec" data-act="novoCliente">+ Cliente</button></div>
-  <div class="card">${db.clientes.length ? db.clientes.map(c => `
+  <div class="section-head"><h2>Clientes (${clientes.length})</h2><button class="btn sec" data-act="novoCliente">+ Cliente</button></div>
+  <div class="card">${clientes.length ? clientes.map(c => `
     <div class="list-item">
-      <div class="info"><div class="title">${esc(c.nome)}</div><div class="sub">${esc(c.telefone)} ${c.endereco ? '· ' + esc(c.endereco) : ''} · ${db.obras.filter(o => o.clienteId === c.id).length} obra(s)</div></div>
+      <div class="info"><div class="title">${esc(c.nome)}</div><div class="sub">${esc(c.telefone)} ${c.endereco ? '· ' + esc(c.endereco) : ''} · ${db.obras.filter(o => o.clienteId === c.id).length} obra(s)${tagCid(c)}</div></div>
       ${c.telefone ? `<a class="btn wa sm" href="https://wa.me/${foneWa(c.telefone)}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
       <button class="btn ghost sm" data-act="editCliente" data-id="${c.id}">Editar</button>
     </div>`).join('') : '<div class="empty">Nenhum cliente cadastrado</div>'}</div>`;
@@ -243,12 +285,12 @@ POS.agenda = () => {
 
 function itemObra(o) {
   const pr = progressoObra(o), rec = recebidoObra(o);
-  const busca = [o.nome, nomeCliente(o.clienteId), o.endereco].join(' ').toLowerCase();
+  const busca = [o.nome, nomeCliente(o.clienteId), o.endereco, o.cidade].join(' ').toLowerCase();
   return `<div class="obra-item" data-busca-obra="${esc(busca)}">
     <div class="obra-top" data-act="verObra" data-id="${o.id}">
       <div class="info">
         <div class="title">${esc(o.nome)}</div>
-        <div class="sub">👤 ${esc(nomeCliente(o.clienteId))}${o.endereco ? ' · 📍 ' + esc(o.endereco) : ''}</div>
+        <div class="sub">👤 ${esc(nomeCliente(o.clienteId))}${o.endereco ? ' · 🏠 ' + esc(o.endereco) : ''}${tagCid(o)}</div>
         <div class="sub">📅 ${br(o.inicio)} a ${br(o.fim || o.inicio)} · ${duracao(o)}${situacaoPrazo(o) ? ' · ' + situacaoPrazo(o) : ''}</div>
       </div>
       <div class="obra-valor">${badgeStatus(o.status)}${o.valor ? `<div><div class="amount">${money(o.valor)}</div><div class="sub">recebido ${money(rec)}</div></div>` : ''}</div>
@@ -277,6 +319,7 @@ actions.verObra = ({ id }) => {
     <div class="progress" style="margin:8px 0 4px"><span style="width:${progressoObra(o)}%"></span></div>
     <div class="sub muted">${progressoObra(o)}% do prazo ${situacaoPrazo(o) ? '· ' + situacaoPrazo(o) : ''}</div>
     <div class="list-item"><div class="info sub">Cliente</div><div>${esc(cli.nome || '—')}</div></div>
+    <div class="list-item"><div class="info sub">Cidade</div><div>📍 ${esc(o.cidade || '—')}</div></div>
     ${o.endereco ? `<div class="list-item"><div class="info sub">Endereço</div><div>${esc(o.endereco)}</div></div>` : ''}
     ${o.obs ? `<div class="list-item"><div class="info sub">Observações</div><div>${esc(o.obs)}</div></div>` : ''}
     <div class="grid grid-2" style="margin-top:10px">
@@ -300,6 +343,7 @@ function formCliente(c = {}) {
   return `<label>Nome *</label><input name="nome" required value="${esc(c.nome)}">
     <label>Telefone / WhatsApp</label><input name="telefone" inputmode="tel" value="${esc(c.telefone)}" placeholder="(00) 00000-0000">
     <label>Endereço</label><input name="endereco" value="${esc(c.endereco)}">
+    ${campoCidade(c)}
     <label>Observações</label><textarea name="obs">${esc(c.obs)}</textarea>`;
 }
 actions.novoCliente = () => abrirModal('Novo cliente', formCliente(), d => { db.clientes.push({ id: uid(), ...d }); toast('Cliente cadastrado'); });
@@ -312,11 +356,14 @@ actions.delCliente = ({ id }) => {
   fecharModal(); confirmarExcluir('clientes', id, 'Excluir este cliente?');
 };
 
+// clientes da cidade escolhida (mais o já vinculado, ao editar)
+const clientesOpc = sel => db.clientes.filter(c => daCid(c) || c.id === sel);
 function formObra(o = {}) {
-  if (!db.clientes.length) return '<div class="empty">Cadastre um cliente antes de criar a obra.</div><div class="form-actions"><button type="button" class="btn" data-act="novoCliente">+ Cadastrar cliente</button></div>';
+  if (!clientesOpc(o.clienteId).length) return '<div class="empty">Cadastre um cliente antes de criar a obra.</div><div class="form-actions"><button type="button" class="btn" data-act="novoCliente">+ Cadastrar cliente</button></div>';
   return `<label>Nome da obra *</label><input name="nome" required value="${esc(o.nome)}" placeholder="Ex.: Casa da Maria — ampliação">
-    <label>Cliente *</label><select name="clienteId" required>${opt(db.clientes, o.clienteId, 'Selecione…')}</select>
+    <label>Cliente *</label><select name="clienteId" required>${opt(clientesOpc(o.clienteId), o.clienteId, 'Selecione…')}</select>
     <label>Endereço da obra</label><input name="endereco" value="${esc(o.endereco)}">
+    ${campoCidade(o)}
     <div class="grid grid-2">
       <div><label>Início *</label><input type="date" name="inicio" required value="${o.inicio || hoje()}"></div>
       <div><label>Término previsto *</label><input type="date" name="fim" required value="${o.fim || o.inicio || hoje()}"></div>
@@ -332,7 +379,7 @@ function validarObra(d) {
   d.valor = num(d.valor);
   return true;
 }
-actions.novaObra = () => abrirModal('Nova obra', formObra(), db.clientes.length ? d => {
+actions.novaObra = () => abrirModal('Nova obra', formObra(), clientesOpc().length ? d => {
   if (!validarObra(d)) return false;
   db.obras.push({ id: uid(), ...d }); toast('Obra cadastrada');
 } : null);
@@ -352,8 +399,8 @@ let fatAno = new Date().getFullYear();
 VIEWS.faturamento = () => {
   const h = hoje();
   const [s1, s2] = rangeSemana(h), [m1, m2] = rangeMes(h), [a1, a2] = rangeAno(h);
-  const fat = (a, b) => soma(db.receitas.filter(r => entre(r.data, a, b)));
-  const lista = [...db.receitas].sort((a, b) => b.data.localeCompare(a.data));
+  const fat = (a, b) => soma(C('receitas').filter(r => entre(r.data, a, b)));
+  const lista = C('receitas').sort((a, b) => b.data.localeCompare(a.data));
   const anoLista = lista.filter(r => r.data.startsWith(String(fatAno)));
   return `
   <div class="grid grid-3">
@@ -378,7 +425,7 @@ VIEWS.faturamento = () => {
   <div class="card">${anoLista.length ? anoLista.map(r => `
     <div class="list-item">
       <div class="info"><div class="title">${esc(r.descricao || 'Recebimento')}</div>
-        <div class="sub">${br(r.data)}${r.obraId ? ' · ' + esc(byId('obras', r.obraId)?.nome || '') : ''}${r.forma ? ' · ' + esc(r.forma) : ''}</div></div>
+        <div class="sub">${br(r.data)}${r.obraId ? ' · ' + esc(byId('obras', r.obraId)?.nome || '') : ''}${r.forma ? ' · ' + esc(r.forma) : ''}${tagCid(r)}</div></div>
       <div class="amount" style="color:var(--ok)">${money(r.valor)}</div>
       <button class="btn ghost sm" data-act="editReceita" data-id="${r.id}">Editar</button>
     </div>`).join('') : '<div class="empty">Nenhum recebimento lançado neste ano</div>'}</div>`;
@@ -409,18 +456,18 @@ POS.faturamento = () => {
   for (let i = 0; i < 12; i++) {
     const fim = addDias(ini, 6);
     labels.push(br(ini).slice(0, 5));
-    vals.push(soma(db.receitas.filter(r => entre(r.data, ini, fim))));
+    vals.push(soma(C('receitas').filter(r => entre(r.data, ini, fim))));
     ini = addDias(ini, 7);
   }
   chartBar('chSemana', labels, [{ label: 'Faturamento', data: vals }]);
   // meses (com gastos para comparação)
-  const fatM = MESES_C.map((_, m) => soma(db.receitas.filter(r => r.data.startsWith(`${fatAno}-${pad(m + 1)}`))));
+  const fatM = MESES_C.map((_, m) => soma(C('receitas').filter(r => r.data.startsWith(`${fatAno}-${pad(m + 1)}`))));
   const gasM = MESES_C.map((_, m) => gastosPeriodo(`${fatAno}-${pad(m + 1)}-01`, iso(new Date(fatAno, m + 1, 0))).total);
   chartBar('chMes', MESES_C, [{ label: 'Faturamento', data: fatM, cor: '#3b82f6' }, { label: 'Gastos', data: gasM, cor: '#94a3b8' }]);
   // anos
-  const anos = [...new Set(db.receitas.map(r => r.data.slice(0, 4)))].sort();
+  const anos = [...new Set(C('receitas').map(r => r.data.slice(0, 4)))].sort();
   if (!anos.length) anos.push(String(new Date().getFullYear()));
-  chartBar('chAno', anos, [{ label: 'Faturamento', data: anos.map(a => soma(db.receitas.filter(r => r.data.startsWith(a)))) }]);
+  chartBar('chAno', anos, [{ label: 'Faturamento', data: anos.map(a => soma(C('receitas').filter(r => r.data.startsWith(a)))) }]);
 };
 
 actions.fatAno = d => { fatAno += Number(d.d); render(); };
@@ -431,13 +478,16 @@ function formReceita(r = {}) {
       <div><label>Data *</label><input type="date" name="data" required value="${r.data || hoje()}"></div>
       <div><label>Valor (R$) *</label><input name="valor" required inputmode="decimal" value="${r.valor ?? ''}"></div>
     </div>
-    <label>Obra (opcional)</label><select name="obraId">${opt(db.obras, r.obraId, 'Sem obra vinculada')}</select>
+    <label>Obra (opcional)</label><select name="obraId">${opt(db.obras.filter(o => daCid(o) || o.id === r.obraId), r.obraId, 'Sem obra vinculada')}</select>
+    ${campoCidade(r)}
     <label>Forma de pagamento</label><select name="forma">${optTxt(['PIX', 'Dinheiro', 'Transferência', 'Cartão', 'Boleto', 'Cheque'], r.forma || 'PIX')}</select>`;
 }
-actions.novaReceita = (d = {}) => abrirModal('Lançar recebimento', formReceita({ obraId: d.obra }), d => { d.valor = num(d.valor); db.receitas.push({ id: uid(), ...d }); toast('Recebimento lançado'); });
+// recebimento ou despesa de uma obra fica na cidade da obra
+const cidadeDaObra = d => { const o = byId('obras', d.obraId); if (o) d.cidade = o.cidade; };
+actions.novaReceita = (d = {}) => abrirModal('Lançar recebimento', formReceita({ obraId: d.obra, cidade: byId('obras', d.obra)?.cidade }), d => { d.valor = num(d.valor); cidadeDaObra(d); db.receitas.push({ id: uid(), ...d }); toast('Recebimento lançado'); });
 actions.editReceita = ({ id }) => {
   const r = byId('receitas', id);
-  abrirModal('Editar recebimento', formReceita(r) + `<div class="row" style="margin-top:12px"><button type="button" class="btn danger sm" data-act="delReg" data-lista="receitas" data-id="${id}">Excluir</button></div>`, d => { d.valor = num(d.valor); Object.assign(r, d); });
+  abrirModal('Editar recebimento', formReceita(r) + `<div class="row" style="margin-top:12px"><button type="button" class="btn danger sm" data-act="delReg" data-lista="receitas" data-id="${id}">Excluir</button></div>`, d => { d.valor = num(d.valor); cidadeDaObra(d); Object.assign(r, d); });
 };
 actions.delReg = ({ lista, id }) => { fecharModal(); confirmarExcluir(lista, id); };
 
@@ -448,8 +498,9 @@ let valeRef = { tipo: 'mes', data: hoje() };
 
 VIEWS.combustivel = () => {
   const [a, b] = rangePor(valeRef.tipo, valeRef.data);
-  const vales = db.vales.filter(v => entre(v.data, a, b)).sort((x, y) => y.data.localeCompare(x.data));
-  const porFunc = db.funcionarios.map(f => ({ f, t: soma(vales.filter(v => v.funcionarioId === f.id)) })).filter(x => x.t);
+  const vales = C('vales').filter(v => entre(v.data, a, b)).sort((x, y) => y.data.localeCompare(x.data));
+  const postos = C('postos');
+  const porFunc = C('funcionarios').map(f => ({ f, t: soma(vales.filter(v => v.funcionarioId === f.id)) })).filter(x => x.t);
   const porPosto = db.postos.map(p => ({ p, t: soma(vales.filter(v => v.postoId === p.id)) })).filter(x => x.t);
   return `
   ${filtroPeriodo(valeRef, 'valeRef')}
@@ -464,7 +515,7 @@ VIEWS.combustivel = () => {
     <div class="list-item">
       <span>⛽</span>
       <div class="info"><div class="title">${esc(byId('funcionarios', v.funcionarioId)?.nome || '—')}</div>
-        <div class="sub">${br(v.data)} · ${esc(byId('postos', v.postoId)?.nome || '—')}${v.obs ? ' · ' + esc(v.obs) : ''}</div></div>
+        <div class="sub">${br(v.data)} · ${esc(byId('postos', v.postoId)?.nome || '—')}${v.obs ? ' · ' + esc(v.obs) : ''}${tagCid(v)}</div></div>
       <div class="amount">${money(v.valor)}</div>
       <button class="btn ghost sm" data-act="pdfVale" data-id="${v.id}" title="Emitir vale">🧾</button>
       <button class="btn ghost sm" data-act="editVale" data-id="${v.id}">Editar</button>
@@ -476,8 +527,8 @@ VIEWS.combustivel = () => {
   </div>` : ''}
 
   <div class="section-head"><h2>Postos de combustível</h2><button class="btn sec" data-act="novoPosto">+ Posto</button></div>
-  <div class="card">${db.postos.length ? db.postos.map(p => `
-    <div class="list-item"><div class="info"><div class="title">${esc(p.nome)}</div><div class="sub">${esc(p.endereco)} ${p.telefone ? '· ' + esc(p.telefone) : ''}</div></div>
+  <div class="card">${postos.length ? postos.map(p => `
+    <div class="list-item"><div class="info"><div class="title">${esc(p.nome)}</div><div class="sub">${esc(p.endereco)} ${p.telefone ? '· ' + esc(p.telefone) : ''}${tagCid(p)}</div></div>
     <button class="btn ghost sm" data-act="editPosto" data-id="${p.id}">Editar</button></div>`).join('') : '<div class="empty">Cadastre os postos conveniados</div>'}</div>
   <p class="muted" style="font-size:13px">Os vales são <b>adiantamento de salário</b>: são descontados automaticamente no relatório da aba Pagamentos. Os colaboradores são cadastrados na aba <b>Funcionários</b>.</p>`;
 };
@@ -500,30 +551,44 @@ document.addEventListener('change', e => {
   if (el.dataset.change && changeActions[el.dataset.change]) changeActions[el.dataset.change](el);
 });
 const changeActions = {};
+changeActions.trocarCidade = el => {
+  if (el.value === '__gerenciar') { render(); actions.gerenciarCidades(); return; }
+  escolherCidade(el.value);
+};
+function escolherCidade(c) {
+  cidadeAtual = c; orcEdit = null;
+  try { localStorage.setItem(KEY + ':cidade', c); } catch (e) { /* ignora */ }
+  render(); ajustarTopo();
+  toast(c ? `📍 ${c}` : '🌎 Todas as cidades somadas');
+}
 changeActions.statusObra = el => { const o = byId('obras', el.dataset.id); o.status = el.value; salvar(); render(); toast(`Status da obra: ${el.value}`); };
 
 function formVale(v = {}) {
-  if (!db.funcionarios.length || !db.postos.length) {
-    return `<div class="empty">Para emitir vales, cadastre ao menos ${!db.funcionarios.length ? 'um colaborador (aba Funcionários)' : ''}${!db.funcionarios.length && !db.postos.length ? ' e ' : ''}${!db.postos.length ? 'um posto' : ''}.</div>`;
+  const fs = C('funcionarios'), ps = C('postos');
+  if (!fs.length || !ps.length) {
+    return `<div class="empty">Para emitir vales${cidadeAtual ? ' em ' + esc(cidadeAtual) : ''}, cadastre ao menos ${!fs.length ? 'um colaborador (aba Funcionários)' : ''}${!fs.length && !ps.length ? ' e ' : ''}${!ps.length ? 'um posto' : ''}.</div>`;
   }
-  return `<label>Colaborador *</label><select name="funcionarioId" required>${opt(db.funcionarios.filter(f => f.ativo !== false || f.id === v.funcionarioId), v.funcionarioId, 'Selecione…')}</select>
-    <label>Posto *</label><select name="postoId" required>${opt(db.postos, v.postoId, 'Selecione…')}</select>
+  return `<label>Colaborador *</label><select name="funcionarioId" required>${opt(db.funcionarios.filter(f => (daCid(f) && f.ativo !== false) || f.id === v.funcionarioId), v.funcionarioId, 'Selecione…')}</select>
+    <label>Posto *</label><select name="postoId" required>${opt(db.postos.filter(p => daCid(p) || p.id === v.postoId), v.postoId, 'Selecione…')}</select>
     <div class="grid grid-2">
       <div><label>Data *</label><input type="date" name="data" required value="${v.data || hoje()}"></div>
       <div><label>Valor do vale / adiantamento (R$) *</label><input name="valor" required inputmode="decimal" value="${v.valor ?? ''}"></div>
     </div>
     <label>Observação</label><input name="obs" value="${esc(v.obs)}" placeholder="Ex.: ida à obra do Centro">`;
 }
-const okVale = () => db.funcionarios.length && db.postos.length;
-actions.novoVale = () => abrirModal('Novo vale combustível', formVale(), okVale() ? d => { d.valor = num(d.valor); db.vales.push({ id: uid(), ...d }); toast('Vale liberado'); } : null);
+const okVale = () => C('funcionarios').length && C('postos').length;
+// o vale fica na cidade do funcionário (é descontado no pagamento dele)
+const cidadeDoFunc = d => { d.cidade = byId('funcionarios', d.funcionarioId)?.cidade || cidadeNova(); };
+actions.novoVale = () => abrirModal('Novo vale combustível', formVale(), okVale() ? d => { d.valor = num(d.valor); cidadeDoFunc(d); db.vales.push({ id: uid(), ...d }); toast('Vale liberado'); } : null);
 actions.editVale = ({ id }) => {
   const v = byId('vales', id);
-  abrirModal('Editar vale', formVale(v) + `<div class="row" style="margin-top:12px"><button type="button" class="btn danger sm" data-act="delReg" data-lista="vales" data-id="${id}">Excluir</button></div>`, d => { d.valor = num(d.valor); Object.assign(v, d); });
+  abrirModal('Editar vale', formVale(v) + `<div class="row" style="margin-top:12px"><button type="button" class="btn danger sm" data-act="delReg" data-lista="vales" data-id="${id}">Excluir</button></div>`, d => { d.valor = num(d.valor); cidadeDoFunc(d); Object.assign(v, d); });
 };
 function formPosto(p = {}) {
   return `<label>Nome do posto *</label><input name="nome" required value="${esc(p.nome)}">
     <label>Endereço</label><input name="endereco" value="${esc(p.endereco)}">
-    <label>Telefone</label><input name="telefone" inputmode="tel" value="${esc(p.telefone)}">`;
+    <label>Telefone</label><input name="telefone" inputmode="tel" value="${esc(p.telefone)}">
+    ${campoCidade(p)}`;
 }
 actions.novoPosto = () => abrirModal('Novo posto', formPosto(), d => { db.postos.push({ id: uid(), ...d }); });
 actions.editPosto = ({ id }) => {
@@ -543,14 +608,14 @@ let orcBusca = '';
 
 VIEWS.orcamentos = () => {
   if (orcEdit) return viewEditorOrc();
-  const lista = [...db.orcamentos].sort((a, b) => b.numero - a.numero);
+  const lista = C('orcamentos').sort((a, b) => b.numero - a.numero);
   return `
   <div class="section-head mt0"><h2>Orçamentos (${lista.length})</h2>
     <div class="row"><button class="btn sec" data-act="verCatalogo">📦 Itens cadastrados</button><button class="btn" data-act="novoOrc">+ Novo orçamento</button></div></div>
   <div class="card">${lista.length ? lista.map(o => `
     <div class="list-item">
       <div class="info"><div class="title">Nº ${o.numero} · ${esc(nomeCliente(o.clienteId))}</div>
-        <div class="sub">${br(o.data)}${o.obraId ? ' · ' + esc(byId('obras', o.obraId)?.nome || '') : ''} · ${o.itens.length} itens</div></div>
+        <div class="sub">${br(o.data)}${o.obraId ? ' · ' + esc(byId('obras', o.obraId)?.nome || '') : ''} · ${o.itens.length} itens${tagCid(o)}</div></div>
       <div style="text-align:right"><span class="badge ${o.status === 'Aprovado' ? 'ok' : o.status === 'Recusado' ? 'gray' : 'warn'}">${esc(o.status || 'Pendente')}</span>
         <div class="amount" style="margin-top:4px">${money(totalOrc(o))}</div></div>
       <button class="btn wa sm" data-act="enviarOrc" data-id="${o.id}">📄 PDF</button>
@@ -578,7 +643,7 @@ function novoRascunho(base) {
 
 function viewEditorOrc() {
   const o = orcEdit;
-  const obrasCli = db.obras.filter(x => !o.clienteId || x.clienteId === o.clienteId);
+  const obrasCli = db.obras.filter(x => o.clienteId ? x.clienteId === o.clienteId : daCid(x));
   const linha = (l, idx) => {
     const tot = num(l.qtd) * num(l.preco);
     const vis = !orcBusca || l.nome.toLowerCase().includes(orcBusca.toLowerCase()) || num(l.qtd) > 0;
@@ -600,7 +665,7 @@ function viewEditorOrc() {
   <div class="card">
     <div class="grid grid-2">
       <div><label class="muted" style="font-size:13px">Cliente *</label>
-        <div class="row" style="flex-wrap:nowrap"><select data-o="clienteId">${opt(db.clientes, o.clienteId, 'Selecione…')}</select><button class="btn sec sm" data-act="novoCliente" title="Novo cliente">+</button></div></div>
+        <div class="row" style="flex-wrap:nowrap"><select data-o="clienteId">${opt(clientesOpc(o.clienteId), o.clienteId, 'Selecione…')}</select><button class="btn sec sm" data-act="novoCliente" title="Novo cliente">+</button></div></div>
       <div><label class="muted" style="font-size:13px">Obra (opcional)</label><select data-o="obraId">${opt(obrasCli, o.obraId, 'Sem obra vinculada')}</select></div>
       <div><label class="muted" style="font-size:13px">Data</label><input type="date" data-o="data" value="${o.data}"></div>
       <div><label class="muted" style="font-size:13px">Validade</label><input type="date" data-o="validade" value="${o.validade}"></div>
@@ -681,7 +746,9 @@ function gravarOrc() {
   const itens = o.linhas.filter(l => num(l.qtd) > 0 && (l.nome || '').trim())
     .map(l => ({ catalogoId: l.catalogoId || null, tipo: l.tipo || 'avulso', nome: l.nome.trim(), unidade: l.unidade, qtd: num(l.qtd), preco: num(l.preco) }));
   if (!itens.length) { alert('Informe a quantidade de pelo menos um item.'); return null; }
-  const reg = { id: o.id || uid(), numero: o.numero || (Math.max(0, ...db.orcamentos.map(x => x.numero)) + 1), clienteId: o.clienteId, obraId: o.obraId,
+  // o orçamento fica na cidade do cliente
+  const cidade = byId('clientes', o.clienteId)?.cidade || o.cidade || cidadeNova();
+  const reg = { id: o.id || uid(), numero: o.numero || (Math.max(0, ...db.orcamentos.map(x => x.numero)) + 1), clienteId: o.clienteId, obraId: o.obraId, cidade,
     data: o.data, validade: o.validade, status: o.status, desconto: num(o.desconto), obs: o.obs, itens };
   const idx = db.orcamentos.findIndex(x => x.id === reg.id);
   if (idx >= 0) db.orcamentos[idx] = reg; else db.orcamentos.push(reg);
@@ -836,7 +903,7 @@ const pesoFalta = x => x.desconta === false ? 0 : (x.tipo === 'meia' ? 0.5 : 1);
 function folha(a, b, ateHoje = false) {
   if (ateHoje && b > hoje()) b = hoje();
   const uteis = diasUteis(a, b);
-  return db.funcionarios.filter(f => f.ativo !== false).map(f => {
+  return C('funcionarios').filter(f => f.ativo !== false).map(f => {
     // considera só o período em que o funcionário estava admitido
     const adm = f.admissao || f.criadoEm || '';
     const ini = adm > a ? adm : a;
@@ -855,7 +922,7 @@ VIEWS.funcionarios = () => {
   const [a, b] = periodoPag();
   const linhas = folha(a, b);
   const total = linhas.reduce((t, l) => t + l.liquido, 0);
-  const faltasPeriodo = db.faltas.filter(x => entre(x.data, a, b)).sort((x, y) => y.data.localeCompare(x.data));
+  const faltasPeriodo = C('faltas').filter(x => entre(x.data, a, b)).sort((x, y) => y.data.localeCompare(x.data));
   return `
   <div class="card">
     <div class="inline-filters">
@@ -879,7 +946,7 @@ VIEWS.funcionarios = () => {
     <div class="row"><button class="btn sec" data-act="lancarFalta">+ Lançar falta</button>${linhas.length ? '<button class="btn wa" data-act="pdfFolha">📄 Relatório PDF</button>' : ''}</div></div>
   <div class="card table-wrap">${linhas.length ? `<table>
     <thead><tr><th>Funcionário</th><th class="num">Diária</th><th class="num">Dias</th><th class="num">Faltas</th><th class="num">Trab.</th><th class="num">Bruto</th><th class="num">Vales</th><th class="num">A pagar</th></tr></thead>
-    <tbody>${linhas.map(l => `<tr><td><b>${esc(l.f.nome)}</b><br><small class="muted">${esc(l.f.funcao || '')}</small></td>
+    <tbody>${linhas.map(l => `<tr><td><b>${esc(l.f.nome)}</b><br><small class="muted">${esc(l.f.funcao || '')}${tagCid(l.f)}</small></td>
       <td class="num">${money(l.f.diaria)}</td><td class="num">${l.dias}</td><td class="num">${String(l.faltas).replace('.', ',')}</td><td class="num">${String(l.trab).replace('.', ',')}</td>
       <td class="num">${money(l.bruto)}</td><td class="num">${l.desc ? '-' + money(l.desc) : '—'}</td><td class="num"><b ${l.liquido < 0 ? 'style="color:var(--danger)"' : ''}>${money(l.liquido)}</b></td></tr>`).join('')}</tbody>
     <tfoot><tr><td colspan="5">Total</td><td class="num">${money(linhas.reduce((t, l) => t + l.bruto, 0))}</td><td class="num">-${money(linhas.reduce((t, l) => t + l.desc, 0))}</td><td class="num">${money(total)}</td></tr></tfoot>
@@ -913,12 +980,13 @@ function resumoFunc(f, mes) {
 }
 
 VIEWS.equipe = () => {
-  const lista = db.funcionarios
+  const funcs = C('funcionarios');
+  const lista = funcs
     .filter(f => equipe.status === 'todos' || (equipe.status === 'ativos' ? f.ativo !== false : f.ativo === false))
     .sort((x, y) => x.nome.localeCompare(y.nome));
-  const ativos = db.funcionarios.filter(f => f.ativo !== false);
+  const ativos = funcs.filter(f => f.ativo !== false);
   const [ma, mb] = [`${equipe.mes}-01`, `${equipe.mes}-${pad(ultimoDia(+equipe.mes.slice(0, 4), +equipe.mes.slice(5) - 1))}`];
-  const faltasMes = db.faltas.filter(x => entre(x.data, ma, mb) && (!equipe.func || x.funcionarioId === equipe.func))
+  const faltasMes = C('faltas').filter(x => entre(x.data, ma, mb) && (!equipe.func || x.funcionarioId === equipe.func))
     .sort((x, y) => y.data.localeCompare(x.data));
   const totalFaltasMes = faltasMes.reduce((t, x) => t + pesoFalta(x), 0);
   const [mm, ma2] = [+equipe.mes.slice(5), equipe.mes.slice(0, 4)];
@@ -945,7 +1013,7 @@ VIEWS.equipe = () => {
         <div class="avatar">${esc(f.nome.trim().split(/\s+/).map(p => p[0]).slice(0, 2).join('').toUpperCase())}</div>
         <div class="info" data-act="verFunc" data-id="${f.id}" style="cursor:pointer">
           <div class="title">${esc(f.nome)} ${f.ativo === false ? '<span class="badge gray">Inativo</span>' : ''}</div>
-          <div class="sub">${esc(f.funcao || 'Sem função')} · Diária ${money(f.diaria)}</div>
+          <div class="sub">${esc(f.funcao || 'Sem função')} · Diária ${money(f.diaria)}${tagCid(f)}</div>
           <div class="sub">${nf ? `<span class="badge warn">${nFaltas(nf)} falta(s) em ${MESES_C[mm - 1]}</span>` : `<span class="badge ok">Sem faltas em ${MESES_C[mm - 1]}</span>`}</div>
         </div>
         <div class="row func-btns" style="justify-content:flex-end">
@@ -954,14 +1022,14 @@ VIEWS.equipe = () => {
           <button class="btn ghost sm" data-act="editFunc" data-id="${f.id}">Editar</button>
         </div>
       </div>`;
-    }).join('') : `<div class="empty">${db.funcionarios.length ? 'Nenhum funcionário neste filtro' : 'Nenhum funcionário cadastrado. Toque em “+ Novo funcionário”.'}</div>`}
+    }).join('') : `<div class="empty">${funcs.length ? 'Nenhum funcionário neste filtro' : 'Nenhum funcionário cadastrado. Toque em “+ Novo funcionário”.'}</div>`}
   </div>
 
   <div class="section-head"><h2>Faltas de ${MESES[mm - 1]}/${ma2}</h2></div>
   <div class="card">
     <div class="inline-filters" style="margin-bottom:6px">
       <div><label>Mês</label><input type="month" value="${equipe.mes}" data-change="equipeMes"></div>
-      <div><label>Funcionário</label><select data-change="equipeFunc">${opt(db.funcionarios, equipe.func, 'Todos')}</select></div>
+      <div><label>Funcionário</label><select data-change="equipeFunc">${opt(funcs, equipe.func, 'Todos')}</select></div>
     </div>
     ${faltasMes.length ? faltasMes.map(x => `
       <div class="list-item"><div class="info"><div class="title">${esc(byId('funcionarios', x.funcionarioId)?.nome || '—')}</div>
@@ -998,6 +1066,7 @@ function formFunc(f = {}) {
       <div><label>Chave PIX</label><input name="pix" value="${esc(f.pix)}"></div>
     </div>
     <label>Endereço</label><input name="endereco" value="${esc(f.endereco)}">
+    ${campoCidade(f)}
     <label>Observações</label><textarea name="obs">${esc(f.obs)}</textarea>
     <label class="check"><input type="checkbox" name="ativo" ${f.ativo !== false ? 'checked' : ''}> Funcionário ativo (desmarque quando sair da empresa)</label>`;
 }
@@ -1029,6 +1098,7 @@ actions.verFunc = ({ id }) => {
     ${linha('Telefone', esc(f.telefone))}
     ${linha('CPF', esc(f.cpf))}
     ${linha('PIX', esc(f.pix))}
+    ${linha('Cidade', '📍 ' + esc(f.cidade || '—'))}
     ${linha('Admissão', br(f.admissao))}
     ${linha('Endereço', esc(f.endereco))}
     ${linha('Observações', esc(f.obs))}
@@ -1047,7 +1117,7 @@ actions.verFunc = ({ id }) => {
 };
 
 function formFalta(x = {}, idFunc) {
-  return `<label>Funcionário *</label><select name="funcionarioId" required>${opt(db.funcionarios.filter(f => f.ativo !== false || f.id === x.funcionarioId), x.funcionarioId || idFunc, 'Selecione…')}</select>
+  return `<label>Funcionário *</label><select name="funcionarioId" required>${opt(db.funcionarios.filter(f => (daCid(f) && f.ativo !== false) || f.id === x.funcionarioId || f.id === idFunc), x.funcionarioId || idFunc, 'Selecione…')}</select>
     <div class="grid grid-2">
       <div><label>Data *</label><input type="date" name="data" required value="${x.data || hoje()}"></div>
       ${x.id ? '' : '<div><label>Até (vários dias, opcional)</label><input type="date" name="ate"></div>'}
@@ -1061,7 +1131,7 @@ function formFalta(x = {}, idFunc) {
     <p class="muted" style="font-size:12.5px;margin:6px 0 0">Desmarque para atestado ou folga paga: fica registrado, mas não reduz o pagamento.</p>`;
 }
 actions.lancarFalta = d => {
-  if (!db.funcionarios.some(f => f.ativo !== false)) return alert('Cadastre os funcionários primeiro.');
+  if (!C('funcionarios').some(f => f.ativo !== false)) return alert('Cadastre os funcionários primeiro.');
   abrirModal('Lançar falta', formFalta({}, d.id), f => {
     const ate = f.ate && f.ate > f.data ? f.ate : f.data;
     delete f.ate;
@@ -1093,9 +1163,9 @@ actions.pdfFolha = () => {
   const nomeTipo = pag.tipo === 'mes' ? 'MENSAL' : pag.tipo === 'q1' ? '1ª QUINZENA' : '2ª QUINZENA';
   const doc = novoPdf(`PAGAMENTO ${nomeTipo}`);
   doc.setFontSize(10);
-  doc.text(`Período: ${br(a)} a ${br(b)} (${MESES[m - 1]}/${y})  ·  Dias úteis: ${diasUteis(a, b)}${db.config.trabalhaSabado ? ' (seg a sáb)' : ' (seg a sex)'}`, 14, 40);
-  const head = ['Funcionário', 'Função', 'Diária', 'Dias', 'Faltas', 'Trab.', 'Bruto', 'Vales (adiant.)', 'A pagar', 'PIX'];
-  const body = linhas.map(l => [l.f.nome, l.f.funcao || '', money(l.f.diaria), l.dias, String(l.faltas).replace('.', ','), String(l.trab).replace('.', ','),
+  doc.text(`Cidade: ${nomeCidade()}  ·  Período: ${br(a)} a ${br(b)} (${MESES[m - 1]}/${y})  ·  Dias úteis: ${diasUteis(a, b)}${db.config.trabalhaSabado ? ' (seg a sáb)' : ' (seg a sex)'}`, 14, 40);
+  const head = [cidadeAtual ? 'Funcionário' : 'Funcionário (cidade)', 'Função', 'Diária', 'Dias', 'Faltas', 'Trab.', 'Bruto', 'Vales (adiant.)', 'A pagar', 'PIX'];
+  const body = linhas.map(l => [l.f.nome + (cidadeAtual ? '' : ` (${l.f.cidade})`), l.f.funcao || '', money(l.f.diaria), l.dias, String(l.faltas).replace('.', ','), String(l.trab).replace('.', ','),
     money(l.bruto), l.desc ? '-' + money(l.desc) : '—', money(l.liquido), l.f.pix || '']);
   const total = linhas.reduce((t, l) => t + l.liquido, 0);
   const cols = head.length;
@@ -1111,7 +1181,7 @@ actions.pdfFolha = () => {
     doc.autoTable({ startY: doc.lastAutoTable.finalY + 13, head: [['Funcionário', 'Data', 'Tipo', 'Motivo']], body: det, ...corTabela });
   }
   rodapePdf(doc);
-  compartilharPdf(doc, `Pagamento_${nomeTipo.replace(/\W+/g, '_')}_${pag.mes}.pdf`, undefined, `Relatório de pagamento ${nomeTipo.toLowerCase()} — ${br(a)} a ${br(b)}: ${money(total)}`);
+  compartilharPdf(doc, `Pagamento_${nomeTipo.replace(/\W+/g, '_')}_${pag.mes}${arqCidade()}.pdf`, undefined, `Relatório de pagamento ${nomeTipo.toLowerCase()} — ${br(a)} a ${br(b)}: ${money(total)}`);
 };
 
 // =====================================================
@@ -1120,11 +1190,11 @@ actions.pdfFolha = () => {
 let gastoRef = { tipo: 'mes', data: hoje() };
 
 function gastosPeriodo(a, b) {
-  const desp = db.despesas.filter(d => entre(d.data, a, b));
-  const vales = soma(db.vales.filter(v => entre(v.data, a, b)));
+  const desp = C('despesas').filter(d => entre(d.data, a, b));
+  const vales = soma(C('vales').filter(v => entre(v.data, a, b)));
   // vale é adiantamento: já faz parte da mão de obra. Conta o maior entre o ganho e o adiantado.
   const fl = folha(a, b, true);
-  const valesFora = soma(db.vales.filter(v => entre(v.data, a, b) && !fl.some(l => l.f.id === v.funcionarioId)));
+  const valesFora = soma(C('vales').filter(v => entre(v.data, a, b) && !fl.some(l => l.f.id === v.funcionarioId)));
   const folhaT = fl.reduce((t, l) => t + Math.max(l.bruto, l.vales), 0) + valesFora;
   const porCat = {};
   desp.forEach(d => (porCat[d.categoria] = (porCat[d.categoria] || 0) + num(d.valor)));
@@ -1135,7 +1205,7 @@ function gastosPeriodo(a, b) {
 VIEWS.gastos = () => {
   const [a, b] = rangePor(gastoRef.tipo, gastoRef.data);
   const g = gastosPeriodo(a, b);
-  const fat = soma(db.receitas.filter(r => entre(r.data, a, b)));
+  const fat = soma(C('receitas').filter(r => entre(r.data, a, b)));
   const saldo = fat - g.total;
   // resumo rápido dos 3 períodos atuais
   const rapido = ['semana', 'quinzena', 'mes'].map(t => { const [x, y] = rangePor(t, hoje()); return { t, v: gastosPeriodo(x, y).total }; });
@@ -1166,7 +1236,7 @@ VIEWS.gastos = () => {
     <div class="row"><button class="btn sec" data-act="pdfGastos">📄 PDF</button><button class="btn" data-act="novaDespesa">+ Lançar despesa</button></div></div>
   <div class="card">${g.desp.length ? g.desp.sort((x, y) => y.data.localeCompare(x.data)).map(d => `
     <div class="list-item"><div class="info"><div class="title">${esc(d.descricao || d.categoria)}</div>
-      <div class="sub">${br(d.data)} · ${esc(d.categoria)}${d.obraId ? ' · ' + esc(byId('obras', d.obraId)?.nome || '') : ''}</div></div>
+      <div class="sub">${br(d.data)} · ${esc(d.categoria)}${d.obraId ? ' · ' + esc(byId('obras', d.obraId)?.nome || '') : ''}${tagCid(d)}</div></div>
       <div class="amount" style="color:var(--danger)">${money(d.valor)}</div>
       <button class="btn ghost sm" data-act="editDespesa" data-id="${d.id}">Editar</button></div>`).join('') : '<div class="empty">Nenhuma despesa no período</div>'}</div>
   <p class="muted" style="font-size:13px">A mão de obra é calculada automaticamente pelas diárias dos funcionários ativos (da admissão até hoje), descontando as faltas. Os vales de combustível são adiantamento de salário, por isso já estão dentro da mão de obra.</p>`;
@@ -1196,20 +1266,21 @@ function formDespesa(d = {}) {
       <div><label>Valor (R$) *</label><input name="valor" required inputmode="decimal" value="${d.valor ?? ''}"></div>
     </div>
     <label>Categoria</label><select name="categoria">${optTxt(CATEGORIAS_GASTO, d.categoria || 'Material')}</select>
-    <label>Obra (opcional)</label><select name="obraId">${opt(db.obras, d.obraId, 'Geral / sem obra')}</select>`;
+    <label>Obra (opcional)</label><select name="obraId">${opt(db.obras.filter(o => daCid(o) || o.id === d.obraId), d.obraId, 'Geral / sem obra')}</select>
+    ${campoCidade(d)}`;
 }
-actions.novaDespesa = (d = {}) => abrirModal('Lançar despesa', formDespesa({ obraId: d.obra }), d => { d.valor = num(d.valor); db.despesas.push({ id: uid(), ...d }); toast('Despesa lançada'); });
+actions.novaDespesa = (d = {}) => abrirModal('Lançar despesa', formDespesa({ obraId: d.obra, cidade: byId('obras', d.obra)?.cidade }), d => { d.valor = num(d.valor); cidadeDaObra(d); db.despesas.push({ id: uid(), ...d }); toast('Despesa lançada'); });
 actions.editDespesa = ({ id }) => {
   const x = byId('despesas', id);
-  abrirModal('Editar despesa', formDespesa(x) + `<div class="row" style="margin-top:12px"><button type="button" class="btn danger sm" data-act="delReg" data-lista="despesas" data-id="${id}">Excluir</button></div>`, d => { d.valor = num(d.valor); Object.assign(x, d); });
+  abrirModal('Editar despesa', formDespesa(x) + `<div class="row" style="margin-top:12px"><button type="button" class="btn danger sm" data-act="delReg" data-lista="despesas" data-id="${id}">Excluir</button></div>`, d => { d.valor = num(d.valor); cidadeDaObra(d); Object.assign(x, d); });
 };
 actions.pdfGastos = () => {
   if (!window.jspdf) return alert('Sem internet para carregar o gerador de PDF.');
   const [a, b] = rangePor(gastoRef.tipo, gastoRef.data);
   const g = gastosPeriodo(a, b);
-  const fat = soma(db.receitas.filter(r => entre(r.data, a, b)));
+  const fat = soma(C('receitas').filter(r => entre(r.data, a, b)));
   const doc = novoPdf('RELATÓRIO DE GASTOS');
-  doc.setFontSize(10); doc.text(`Período: ${br(a)} a ${br(b)}`, 14, 40);
+  doc.setFontSize(10); doc.text(`Cidade: ${nomeCidade()}  ·  Período: ${br(a)} a ${br(b)}`, 14, 40);
   doc.autoTable({ startY: 45, head: [['Resumo', 'Valor']], ...corTabela, columnStyles: { 1: { halign: 'right' } },
     body: [['Mão de obra (diárias − faltas)', money(g.folha)], ['   (já adiantado em vales)', money(g.vales)], ...Object.entries(g.porCat).map(([c, v]) => [c, money(v)]),
       [{ content: 'Total de gastos', styles: { fontStyle: 'bold' } }, { content: money(g.total), styles: { fontStyle: 'bold' } }],
@@ -1219,20 +1290,20 @@ actions.pdfGastos = () => {
       body: g.desp.map(d => [br(d.data), d.descricao || '', d.categoria, byId('obras', d.obraId)?.nome || '', money(d.valor)]) });
   }
   rodapePdf(doc);
-  compartilharPdf(doc, `Gastos_${a}_a_${b}.pdf`, undefined, `Relatório de gastos ${br(a)} a ${br(b)}`);
+  compartilharPdf(doc, `Gastos_${a}_a_${b}${arqCidade()}.pdf`, undefined, `Relatório de gastos ${br(a)} a ${br(b)}`);
 };
 
 actions.pdfVales = () => {
   if (!window.jspdf) return alert('Sem internet para carregar o gerador de PDF.');
   const [a, b] = rangePor(valeRef.tipo, valeRef.data);
-  const vales = db.vales.filter(v => entre(v.data, a, b)).sort((x, y) => x.data.localeCompare(y.data));
+  const vales = C('vales').filter(v => entre(v.data, a, b)).sort((x, y) => x.data.localeCompare(y.data));
   const doc = novoPdf('VALES COMBUSTÍVEL');
-  doc.setFontSize(10); doc.text(`Período: ${br(a)} a ${br(b)}`, 14, 40);
+  doc.setFontSize(10); doc.text(`Cidade: ${nomeCidade()}  ·  Período: ${br(a)} a ${br(b)}`, 14, 40);
   doc.autoTable({ startY: 45, head: [['Data', 'Colaborador', 'Posto', 'Valor']], ...corTabela, columnStyles: { 3: { halign: 'right' } },
     body: vales.map(v => [br(v.data), byId('funcionarios', v.funcionarioId)?.nome || '', byId('postos', v.postoId)?.nome || '', money(v.valor)]),
     foot: [[{ content: 'TOTAL', colSpan: 3 }, money(soma(vales))]], footStyles: { fillColor: [226, 236, 250], textColor: 30 } });
   rodapePdf(doc);
-  compartilharPdf(doc, `Vales_${a}_a_${b}.pdf`, undefined, `Vales combustível ${br(a)} a ${br(b)}`);
+  compartilharPdf(doc, `Vales_${a}_a_${b}${arqCidade()}.pdf`, undefined, `Vales combustível ${br(a)} a ${br(b)}`);
 };
 actions.pdfVale = ({ id }) => {
   if (!window.jspdf) return alert('Sem internet para carregar o gerador de PDF.');
@@ -1253,7 +1324,7 @@ actions.pdfVale = ({ id }) => {
 const STATUS_EMP = ['Aberta', 'Em andamento', 'Concluída'];
 
 VIEWS.empreitadas = () => {
-  const lista = [...db.empreitadas].sort((a, b) => (b.inicio || '').localeCompare(a.inicio || ''));
+  const lista = C('empreitadas').sort((a, b) => (b.inicio || '').localeCompare(a.inicio || ''));
   const recebido = e => soma(db.receitas.filter(r => r.empreitadaId === e.id));
   const abertas = lista.filter(e => e.status !== 'Concluída');
   const aReceber = lista.reduce((t, e) => t + Math.max(0, num(e.valor) - recebido(e)), 0);
@@ -1262,7 +1333,7 @@ VIEWS.empreitadas = () => {
     return `<div class="list-item">
       <span>🔨</span>
       <div class="info"><div class="title">${esc(e.servico)}</div>
-        <div class="sub">${esc(e.cliente)}${e.endereco ? ' · ' + esc(e.endereco) : ''}</div>
+        <div class="sub">${esc(e.cliente)}${e.endereco ? ' · ' + esc(e.endereco) : ''}${tagCid(e)}</div>
         <div class="sub">${br(e.inicio)}${e.prazo ? ' · prazo ' + esc(e.prazo) + ' dia(s)' : ''}${e.responsavelId ? ' · ' + esc(byId('funcionarios', e.responsavelId)?.nome || '') : ''}</div></div>
       <div style="text-align:right">${badgeStatus(e.status === 'Aberta' ? 'Agendada' : e.status).replace('Agendada', 'Aberta')}
         <div class="amount" style="margin-top:4px">${money(e.valor)}</div>
@@ -1286,11 +1357,12 @@ VIEWS.empreitadas = () => {
 function formEmp(e = {}) {
   return `<label>Serviço *</label><input name="servico" required value="${esc(e.servico)}" placeholder="Ex.: Construção de muro 10m">
     <label>Cliente *</label><input name="cliente" required value="${esc(e.cliente)}" list="listaClientes">
-    <datalist id="listaClientes">${db.clientes.map(c => `<option>${esc(c.nome)}</option>`).join('')}</datalist>
+    <datalist id="listaClientes">${C('clientes').map(c => `<option>${esc(c.nome)}</option>`).join('')}</datalist>
     <div class="grid grid-2">
       <div><label>Telefone</label><input name="telefone" inputmode="tel" value="${esc(e.telefone)}"></div>
       <div><label>Endereço</label><input name="endereco" value="${esc(e.endereco)}"></div>
     </div>
+    ${campoCidade(e)}
     <div class="grid grid-2">
       <div><label>Valor combinado (R$) *</label><input name="valor" required inputmode="decimal" value="${e.valor ?? ''}"></div>
       <div><label>Status</label><select name="status">${optTxt(STATUS_EMP, e.status || 'Aberta')}</select></div>
@@ -1299,7 +1371,7 @@ function formEmp(e = {}) {
       <div><label>Início</label><input type="date" name="inicio" value="${e.inicio || hoje()}"></div>
       <div><label>Prazo (dias)</label><input name="prazo" inputmode="numeric" value="${esc(e.prazo)}"></div>
     </div>
-    <label>Responsável</label><select name="responsavelId">${opt(db.funcionarios, e.responsavelId, 'Nenhum')}</select>
+    <label>Responsável</label><select name="responsavelId">${opt(db.funcionarios.filter(f => daCid(f) || f.id === e.responsavelId), e.responsavelId, 'Nenhum')}</select>
     <label>Observações</label><textarea name="obs">${esc(e.obs)}</textarea>`;
 }
 actions.novaEmp = () => abrirModal('Nova empreitada', formEmp(), d => { d.valor = num(d.valor); db.empreitadas.push({ id: uid(), ...d }); toast('Empreitada cadastrada'); });
@@ -1318,10 +1390,150 @@ actions.receberEmp = ({ id }) => {
       <div><label>Valor (R$) *</label><input name="valor" required inputmode="decimal" value="${Math.max(0, num(e.valor) - rec)}"></div>
     </div>
     <label>Forma de pagamento</label><select name="forma">${optTxt(['PIX', 'Dinheiro', 'Transferência', 'Cartão'], 'PIX')}</select>`, d => {
-    db.receitas.push({ id: uid(), data: d.data, valor: num(d.valor), forma: d.forma, descricao: `Empreitada: ${e.servico} (${e.cliente})`, empreitadaId: id });
+    db.receitas.push({ id: uid(), data: d.data, valor: num(d.valor), forma: d.forma, descricao: `Empreitada: ${e.servico} (${e.cliente})`, empreitadaId: id, cidade: e.cidade });
     if (rec + num(d.valor) >= num(e.valor)) e.status = 'Concluída';
     toast('Recebimento lançado no faturamento');
   }, 'Registrar');
+};
+
+// =====================================================
+// 8) TODAS AS CIDADES (resumo somando as cidades)
+// =====================================================
+let cidRef = { tipo: 'mes', data: hoje() };
+REFS.cidRef = () => cidRef;
+const arqCidade = () => cidadeAtual ? '_' + cidadeAtual.replace(/[^\wÀ-ú]+/g, '_') : '';
+
+// números de uma cidade no período (cid vazio = todas)
+function resumoCidade(cid, a, b) {
+  return comCidade(cid, () => {
+    const fat = soma(C('receitas').filter(r => entre(r.data, a, b)));
+    const g = gastosPeriodo(a, b);
+    const obrasAtivas = C('obras').filter(o => o.status !== 'Concluída');
+    const empAbertas = C('empreitadas').filter(e => e.status !== 'Concluída');
+    const recEmp = e => soma(db.receitas.filter(r => r.empreitadaId === e.id));
+    const aReceber = obrasAtivas.reduce((t, o) => t + Math.max(0, num(o.valor) - recebidoObra(o)), 0) +
+      C('empreitadas').reduce((t, e) => t + Math.max(0, num(e.valor) - recEmp(e)), 0);
+    return {
+      cid, fat, gastos: g.total, maoObra: g.folha, despesas: g.despT, vales: g.vales, saldo: fat - g.total, aReceber,
+      obras: obrasAtivas.length, andamento: obrasAtivas.filter(o => o.status === 'Em andamento').length,
+      emp: empAbertas.length, func: C('funcionarios').filter(f => f.ativo !== false).length,
+      orcPend: C('orcamentos').filter(o => (o.status || 'Pendente') === 'Pendente').length,
+    };
+  });
+}
+
+VIEWS.cidades = () => {
+  const [a, b] = rangePor(cidRef.tipo, cidRef.data);
+  const linhas = db.config.cidades.map(c => resumoCidade(c, a, b));
+  const t = resumoCidade('', a, b);
+  const cor = v => `style="color:var(${v < 0 ? '--danger' : '--ok'})"`;
+  return `
+  <div class="card row cid-aviso">
+    <div class="info" style="flex:1 1 240px">🌎 <b>Todas as cidades somadas.</b> <span class="muted">Para ver só uma cidade, escolha no 📍 do topo ou toque em <b>Abrir</b>.</span></div>
+    <button class="btn sec" data-act="gerenciarCidades">➕ Cidades</button>
+  </div>
+  ${filtroPeriodo(cidRef, 'cidRef', ['semana', 'quinzena', 'mes', 'ano'])}
+
+  <div class="section-head"><h2>Total geral · ${br(a)} a ${br(b)}</h2>${linhas.length ? '<button class="btn wa" data-act="pdfCidades">📄 PDF</button>' : ''}</div>
+  <div class="grid grid-3">
+    <div class="stat"><div class="label">Faturamento</div><div class="value" style="color:var(--ok)">${money(t.fat)}</div></div>
+    <div class="stat"><div class="label">Gastos</div><div class="value" style="color:var(--danger)">${money(t.gastos)}</div></div>
+    <div class="stat hl"><div class="label">Saldo</div><div class="value">${money(t.saldo)}</div></div>
+  </div>
+  <div class="grid grid-3" style="margin-top:12px">
+    <div class="stat"><div class="label">Obras ativas</div><div class="value">${t.obras} <small class="muted" style="font-size:13px;font-weight:500">· ${t.emp} empreitada(s)</small></div></div>
+    <div class="stat"><div class="label">Funcionários ativos</div><div class="value">${t.func}</div></div>
+    <div class="stat"><div class="label">A receber (obras + empreitadas)</div><div class="value">${money(t.aReceber)}</div></div>
+  </div>
+
+  <div class="section-head"><h2>Por cidade</h2></div>
+  <div class="cid-cards">${linhas.map(l => `
+    <div class="card cid-card">
+      <div class="cid-head"><b>📍 ${esc(l.cid)}</b><button class="btn sm" data-act="abrirCidade" data-c="${esc(l.cid)}">Abrir ›</button></div>
+      <div class="cid-nums">
+        <div><span>Faturamento</span><b style="color:var(--ok)">${money(l.fat)}</b></div>
+        <div><span>Gastos</span><b style="color:var(--danger)">${money(l.gastos)}</b></div>
+        <div><span>Saldo</span><b ${cor(l.saldo)}>${money(l.saldo)}</b></div>
+        <div><span>A receber</span><b>${money(l.aReceber)}</b></div>
+      </div>
+      <div class="sub muted">🏗️ ${l.obras} obra(s) ativa(s) · 🔨 ${l.emp} empreitada(s) · 👷 ${l.func} funcionário(s) · 🧾 ${l.orcPend} orçamento(s) pendente(s)</div>
+      ${t.fat ? `<div class="progress" title="Participação no faturamento"><span style="width:${Math.round(l.fat / t.fat * 100)}%"></span></div><div class="sub muted">${Math.round(l.fat / t.fat * 100)}% do faturamento total</div>` : ''}
+    </div>`).join('')}</div>
+
+  <div class="section-head"><h2>Comparativo entre cidades</h2></div>
+  <div class="card"><div class="chart-box"><canvas id="chCidades"></canvas></div></div>
+
+  <div class="card table-wrap"><table>
+    <thead><tr><th>Cidade</th><th class="num">Faturamento</th><th class="num">Mão de obra</th><th class="num">Despesas</th><th class="num">Gastos</th><th class="num">Saldo</th><th class="num">A receber</th></tr></thead>
+    <tbody>${linhas.map(l => `<tr><td><b>${esc(l.cid)}</b></td><td class="num">${money(l.fat)}</td><td class="num">${money(l.maoObra)}</td><td class="num">${money(l.despesas)}</td><td class="num">${money(l.gastos)}</td><td class="num"><b ${cor(l.saldo)}>${money(l.saldo)}</b></td><td class="num">${money(l.aReceber)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td>Total</td><td class="num">${money(t.fat)}</td><td class="num">${money(t.maoObra)}</td><td class="num">${money(t.despesas)}</td><td class="num">${money(t.gastos)}</td><td class="num">${money(t.saldo)}</td><td class="num">${money(t.aReceber)}</td></tr></tfoot>
+  </table></div>`;
+};
+
+POS.cidades = () => {
+  const [a, b] = rangePor(cidRef.tipo, cidRef.data);
+  const linhas = db.config.cidades.map(c => resumoCidade(c, a, b));
+  chartBar('chCidades', linhas.map(l => l.cid), [
+    { label: 'Faturamento', data: linhas.map(l => l.fat), cor: '#3b82f6' },
+    { label: 'Gastos', data: linhas.map(l => l.gastos), cor: '#94a3b8' },
+    { label: 'Saldo', data: linhas.map(l => l.saldo), cor: '#22c55e' },
+  ]);
+};
+
+actions.abrirCidade = ({ c }) => { escolherCidade(c); actions.goTab({ tab: 'agenda' }); };
+
+actions.pdfCidades = () => {
+  if (!window.jspdf) return alert('Sem internet para carregar o gerador de PDF.');
+  const [a, b] = rangePor(cidRef.tipo, cidRef.data);
+  const linhas = db.config.cidades.map(c => resumoCidade(c, a, b));
+  const t = resumoCidade('', a, b);
+  const doc = novoPdf('RESUMO POR CIDADE');
+  doc.setFontSize(10); doc.text(`Todas as cidades  ·  Período: ${br(a)} a ${br(b)}`, 14, 40);
+  const lin = l => [l.cid, money(l.fat), money(l.maoObra), money(l.despesas), money(l.gastos), money(l.saldo), money(l.aReceber), `${l.obras} / ${l.emp}`, l.func];
+  doc.autoTable({
+    startY: 45, ...corTabela, head: [['Cidade', 'Faturamento', 'Mão de obra', 'Despesas', 'Gastos', 'Saldo', 'A receber', 'Obras/Empr.', 'Func.']],
+    body: linhas.map(lin), foot: [lin({ ...t, cid: 'TOTAL' })],
+    footStyles: { fillColor: [226, 236, 250], textColor: 30, fontStyle: 'bold' },
+    columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'center' }, 8: { halign: 'center' } },
+  });
+  rodapePdf(doc);
+  compartilharPdf(doc, `Resumo_cidades_${a}_a_${b}.pdf`, undefined, `Resumo de todas as cidades ${br(a)} a ${br(b)}: faturamento ${money(t.fat)}, gastos ${money(t.gastos)}, saldo ${money(t.saldo)}`);
+};
+
+// ---------- Cadastro de cidades ----------
+const usoCidade = c => LISTAS_CIDADE.reduce((t, l) => t + db[l].filter(x => x.cidade === c).length, 0);
+actions.gerenciarCidades = () => {
+  abrirModal('Cidades', `
+    <p class="muted" style="font-size:13px;margin-top:0">Cada obra, cliente, funcionário, vale, recebimento, despesa, orçamento e empreitada pertence a uma cidade.</p>
+    ${db.config.cidades.map(c => `<div class="list-item"><div class="info"><div class="title">📍 ${esc(c)}</div><div class="sub">${usoCidade(c)} registro(s)</div></div>
+      <button type="button" class="btn ghost sm" data-act="renomearCidade" data-c="${esc(c)}">Renomear</button>
+      ${db.config.cidades.length > 1 ? `<button type="button" class="btn danger sm" data-act="excluirCidade" data-c="${esc(c)}">Excluir</button>` : ''}</div>`).join('')}
+    <label>Nova cidade</label>
+    <div class="row" style="flex-wrap:nowrap"><input name="nova" placeholder="Ex.: Iguatu" style="flex:1 1 auto;min-width:0"><button class="btn" type="submit" style="flex:0 0 auto">Adicionar</button></div>`, d => {
+    const nome = (d.nova || '').trim();
+    if (!nome) { alert('Digite o nome da cidade.'); return false; }
+    if (db.config.cidades.some(c => c.toLowerCase() === nome.toLowerCase())) { alert('Essa cidade já está cadastrada.'); return false; }
+    db.config.cidades.push(nome);
+    salvar(); setTimeout(() => { escolherCidade(nome); actions.gerenciarCidades(); });
+  }, 'Adicionar');
+  // o próprio campo tem o botão Adicionar: tira os botões padrão do rodapé
+  document.querySelector('#modalForm > .form-actions')?.remove();
+};
+actions.renomearCidade = ({ c }) => {
+  const nome = (prompt('Novo nome da cidade:', c) || '').trim();
+  if (!nome || nome === c) return;
+  if (db.config.cidades.some(x => x !== c && x.toLowerCase() === nome.toLowerCase())) return alert('Já existe uma cidade com esse nome.');
+  db.config.cidades = db.config.cidades.map(x => x === c ? nome : x);
+  LISTAS_CIDADE.forEach(l => db[l].forEach(x => { if (x.cidade === c) x.cidade = nome; }));
+  if (cidadeAtual === c) { cidadeAtual = nome; try { localStorage.setItem(KEY + ':cidade', nome); } catch (e) { /* ignora */ } }
+  salvar(); render(); actions.gerenciarCidades(); toast('Cidade renomeada');
+};
+actions.excluirCidade = ({ c }) => {
+  if (usoCidade(c)) return alert(`${c} tem registros cadastrados. Mude esses registros para outra cidade (no Editar de cada um) ou use Renomear.`);
+  if (!confirm(`Excluir a cidade ${c}?`)) return;
+  db.config.cidades = db.config.cidades.filter(x => x !== c);
+  if (cidadeAtual === c) cidadeAtual = db.config.cidades[0];
+  salvar(); render(); actions.gerenciarCidades();
 };
 
 // =====================================================
@@ -1339,6 +1551,10 @@ VIEWS.config = () => `
     <p class="muted" style="font-size:13px">Esses dados aparecem no cabeçalho dos PDFs.</p>
     <div class="form-actions"><button class="btn" type="submit">Salvar</button></div>
   </form></div>
+
+  <div class="section-head"><h2>Cidades (${db.config.cidades.length})</h2><button class="btn sec" data-act="gerenciarCidades">➕ Adicionar / editar</button></div>
+  <div class="card">${db.config.cidades.map(c => `<div class="list-item"><div class="info"><div class="title">📍 ${esc(c)}</div><div class="sub">${usoCidade(c)} registro(s)</div></div>
+    <button class="btn ghost sm" data-act="abrirCidade" data-c="${esc(c)}">Abrir</button></div>`).join('')}</div>
 
   <div class="section-head"><h2>Backup dos dados</h2></div>
   <div class="card">
@@ -1380,8 +1596,8 @@ POS.config = () => {
       const dados = JSON.parse(await f.text());
       if (!dados || !Array.isArray(dados.obras)) throw new Error('arquivo inválido');
       if (!confirm('Substituir todos os dados atuais pelos do backup?')) return;
-      const base = estadoInicial();
-      db = { ...base, ...dados, config: { ...base.config, ...(dados.config || {}) } };
+      db = migrar(dados);
+      if (cidadeAtual && !db.config.cidades.includes(cidadeAtual)) cidadeAtual = db.config.cidades[0];
       salvar(); render(); toast('Backup restaurado');
     } catch (err) { alert('Arquivo de backup inválido.'); }
   });
@@ -1395,7 +1611,7 @@ actions.exportar = () => {
 actions.zerar = () => {
   if (!confirm('Apagar TODOS os dados? Esta ação não pode ser desfeita.')) return;
   if (prompt('Digite APAGAR para confirmar') !== 'APAGAR') return;
-  db = estadoInicial(); salvar(); render(); toast('Dados apagados');
+  db = estadoInicial(); cidadeAtual = db.config.cidades[0]; salvar(); render(); toast('Dados apagados');
 };
 
 // =====================================================
