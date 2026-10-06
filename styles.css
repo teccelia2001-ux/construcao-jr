@@ -370,3 +370,14 @@ td.num, th.num, tfoot td { white-space: nowrap; }
 .login-card .btn { width: 100%; margin-top: 12px; }
 .login-erro { color: var(--danger, #f87171); font-size: 13.5px; min-height: 18px; margin: 8px 0 0; }
 body.sem-login .topbar, body.sem-login .tabs, body.sem-login main { visibility: hidden; }
+
+/* Validar orçamento */
+.val-opcoes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.val-op { display: flex; gap: 10px; align-items: flex-start; margin: 0; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: #081a31; cursor: pointer; }
+.val-op input { width: auto; margin-top: 3px; accent-color: var(--primary); }
+.val-op span { display: flex; flex-direction: column; gap: 2px; }
+.val-op small { color: var(--muted); font-size: 12.5px; line-height: 1.35; }
+.val-op:has(input:checked) { border-color: var(--primary); background: rgba(37, 99, 235, .16); }
+.val-propria { display: none; margin-top: 4px; }
+#modalForm:has(input[name=tipo][value=propria]:checked) .val-propria { display: grid; }
+@media (max-width: 480px) { .val-opcoes { grid-template-columns: 1fr; } }

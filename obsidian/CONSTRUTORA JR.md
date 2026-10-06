@@ -3,8 +3,8 @@ projeto: CONSTRUTORA JR
 empresa: JR Construções
 slogan: Sua obra em boas mãos
 status: em uso
-versao: 1.8.0
-atualizado: 2026-10-05
+versao: 1.9.0
+atualizado: 2026-10-06
 link: https://teccelia2001-ux.github.io/construcao-jr/
 repositorio: https://github.com/teccelia2001-ux/construcao-jr
 branch: claude/happy-gauss-jjrtqt
@@ -19,7 +19,7 @@ tags:
 > [!info] Acesso
 > - **Link do app:** https://teccelia2001-ux.github.io/construcao-jr/
 > - **Código (GitHub):** https://github.com/teccelia2001-ux/construcao-jr
-> - **Versão atual:** `v1.8.0` (2026-10-05)
+> - **Versão atual:** `v1.9.0` (2026-10-06)
 > - **Banco de dados:** Supabase. Entrada com **e-mail e senha**.
 > - Funciona no **celular, tablet e computador**, e também **offline**.
 
@@ -41,6 +41,8 @@ Criar um app para a construtora com **uma aba para cada item**:
 - [x] Mesmo visual ("skin") do app Agenda do Salão. Depois foi trocado pela **identidade azul da JR Construções**.
 - [x] **Informações por cidade** (ex.: Lavras da Mangabeira) e uma aba que **soma todas as cidades**.
 - [x] **Dados na nuvem (Supabase)** com login por e-mail e senha, nos níveis **administrador** e **leitor**.
+- [x] **Validar orçamento** como **Própria** (entra nos gastos) ou **Cliente**.
+- [x] Painéis de cadastro **não fecham ao clicar fora**.
 
 ## 🗂️ Abas do app
 
@@ -50,7 +52,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 | 🏗️ **Obras** | Lista de obras com busca, filtro por status e andamento pelo prazo. Ficha da obra com recebimentos, gastos e orçamentos, mais o cadastro de clientes |
 | 💰 **Faturamento** | Recebimentos com totais da semana, do mês e do ano, e gráficos |
 | ⛽ **Combustível** | Vale (colaborador, posto, valor) **sem placa**, com PDF do vale e relatório |
-| 🧾 **Orçamentos** | Catálogo pré-cadastrado, itens avulsos, desconto e PDF para o WhatsApp |
+| 🧾 **Orçamentos** | Catálogo pré-cadastrado, itens avulsos, desconto, PDF para o WhatsApp e botão **Validar** (Própria ou Cliente) |
 | 👷 **Funcionários** | Adicionar, editar, ficha completa, ativo ou inativo e faltas (com motivo e se desconta) |
 | 💵 **Pagamentos** | Relatório da 1ª quinzena, 2ª quinzena ou do mês, com bruto, vales, valor a pagar e PDF |
 | 📉 **Gastos** | Semana, quinzena e mês: mão de obra mais despesas, comparados com o faturamento |
@@ -78,6 +80,14 @@ Criar um app para a construtora com **uma aba para cada item**:
 - A estrutura do banco está no arquivo `supabase/banco.sql`. O endereço do projeto e a chave pública estão em `supabase-config.js`.
 - O **backup em arquivo foi retirado**, porque os dados já ficam guardados no banco.
 
+## ✔ Validar orçamento
+
+- Cada orçamento tem o botão **✔ Validar**. Ao validar, escolha quem paga:
+  - **🏗️ Própria:** a construtora paga. O valor do orçamento **entra em Gastos** como despesa, na data e categoria escolhidas (padrão: Material), ligada à obra e à cidade do orçamento.
+  - **👤 Cliente:** o cliente paga. O orçamento fica **Aprovado** e não entra nos gastos.
+- Se um orçamento validado como própria for editado, o gasto acompanha o novo valor.
+- **Desfazer validação** (no mesmo botão) ou excluir o orçamento tira o gasto de Gastos.
+
 ## 📏 Regras de negócio
 
 > [!important] Vale combustível = adiantamento de salário
@@ -92,6 +102,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 - **PDFs:**
   - **No celular:** abre o compartilhamento do sistema para mandar pelo WhatsApp.
   - **No computador:** o arquivo é baixado direto na pasta Downloads.
+- **Painéis de cadastro:** só fecham no **✕** ou em **Cancelar**. Clicar fora não fecha, para não perder o que foi digitado.
 - **Dados:** ficam no **Supabase**. Qualquer aparelho com login vê as mesmas informações.
 
 ## 📲 Instalar como aplicativo (sem a barra do navegador)
@@ -131,6 +142,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 | 1.6.0 | Responsivo para qualquer tela e instalação como aplicativo |
 | 1.7.0 | Informações por cidade (seletor 📍 no topo) e aba **Todas as cidades** |
 | 1.8.0 | Dados no **Supabase**, login por e-mail e senha (administrador e leitor), sem backup em arquivo |
+| 1.9.0 | Botão **Validar orçamento** (Própria entra nos gastos, ou Cliente) e painéis que não fecham ao clicar fora |
 
 ## 📌 Pendências e ideias
 

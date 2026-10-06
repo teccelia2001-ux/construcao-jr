@@ -4,7 +4,7 @@
 // ---------- Dados ----------
 const KEY = 'construtora-jr-v1';
 // Versão do app — ao publicar mudanças, aumente aqui, no version.json e nos ?v= do index.html
-const APP_VERSION = '1.8.0';
+const APP_VERSION = '1.9.0';
 
 const CATALOGO_PADRAO = [
   ['material', 'Tijolo 8 furos', 'milheiro', 900],
@@ -214,7 +214,7 @@ document.getElementById('modalForm').addEventListener('submit', e => {
   e.target.querySelectorAll('input[type=checkbox]').forEach(c => (dados[c.name] = c.checked));
   if (modalSalvar(dados) !== false) { fecharModal(); salvar(); render(); }
 });
-document.getElementById('modalBg').addEventListener('click', e => { if (e.target.id === 'modalBg') fecharModal(); });
+// clicar fora não fecha o painel (evita perder o que foi digitado): fecha só no ✕ ou em Cancelar
 
 const opt = (lista, sel, vazio) => (vazio ? `<option value="">${vazio}</option>` : '') +
   lista.map(x => `<option value="${x.id}" ${x.id === sel ? 'selected' : ''}>${esc(x.nome)}</option>`).join('');
@@ -671,7 +671,9 @@ VIEWS.orcamentos = () => {
       <div class="info"><div class="title">Nº ${o.numero} · ${esc(nomeCliente(o.clienteId))}</div>
         <div class="sub">${br(o.data)}${o.obraId ? ' · ' + esc(byId('obras', o.obraId)?.nome || '') : ''} · ${o.itens.length} itens${tagCid(o)}</div></div>
       <div style="text-align:right"><span class="badge ${o.status === 'Aprovado' ? 'ok' : o.status === 'Recusado' ? 'gray' : 'warn'}">${esc(o.status || 'Pendente')}</span>
+        ${o.validacao ? `<span class="badge ${o.validacao.tipo === 'propria' ? '' : 'ok'}">✔ ${o.validacao.tipo === 'propria' ? 'Própria · nos gastos' : 'Cliente'}</span>` : ''}
         <div class="amount" style="margin-top:4px">${money(totalOrc(o))}</div></div>
+      <button class="btn ${o.validacao ? 'ghost' : 'sec'} sm" data-act="validarOrc" data-id="${o.id}">${o.validacao ? 'Validado' : '✔ Validar'}</button>
       <button class="btn wa sm" data-act="enviarOrc" data-id="${o.id}">📄 PDF</button>
       <button class="btn ghost sm" data-act="editOrc" data-id="${o.id}">Abrir</button>
     </div>`).join('') : '<div class="empty">Nenhum orçamento criado</div>'}</div>`;
@@ -791,7 +793,60 @@ actions.addAvulso = () => { orcEdit.linhas.push({ avulso: true, nome: '', unidad
 actions.rmLinha = ({ i }) => { orcEdit.linhas.splice(Number(i), 1); render(); };
 actions.delOrc = () => {
   if (!confirm('Excluir este orçamento?')) return;
+  removerGastoOrc(orcEdit);
   db.orcamentos = db.orcamentos.filter(x => x.id !== orcEdit.id); orcEdit = null; salvar(); render();
+};
+
+// ---------- Validar orçamento ----------
+// Própria: a própria construtora paga o material/serviço → o valor entra em Gastos como despesa.
+// Cliente: o cliente paga → só fica aprovado, não entra nos gastos.
+const despesaDoOrc = o => o?.validacao?.despesaId && db.despesas.find(d => d.id === o.validacao.despesaId);
+function removerGastoOrc(o) {
+  const d = despesaDoOrc(o);
+  if (d) db.despesas = db.despesas.filter(x => x.id !== d.id);
+}
+// mantém a despesa igual ao orçamento (valor, obra, cidade) quando ele é editado
+function sincronizarGastoOrc(o) {
+  const d = despesaDoOrc(o);
+  if (o.validacao?.tipo !== 'propria' || !d) return;
+  Object.assign(d, { valor: totalOrc(o), obraId: o.obraId || '', cidade: o.cidade, descricao: `Orçamento Nº ${o.numero} (própria)` });
+}
+actions.validarOrc = ({ id }) => {
+  const o = byId('orcamentos', id); if (!o) return;
+  const v = o.validacao || {};
+  const d = despesaDoOrc(o) || {};
+  abrirModal(`Validar orçamento Nº ${o.numero}`, `
+    <p class="muted" style="margin-top:0">${esc(nomeCliente(o.clienteId))}${o.obraId ? ' · ' + esc(byId('obras', o.obraId)?.nome || '') : ''} · <b>${money(totalOrc(o))}</b></p>
+    <label>Quem paga este orçamento? *</label>
+    <div class="val-opcoes">
+      <label class="val-op"><input type="radio" name="tipo" value="propria" required ${v.tipo === 'propria' ? 'checked' : ''}>
+        <span><b>🏗️ Própria</b><small>A construtora paga. O valor entra em <b>Gastos</b>.</small></span></label>
+      <label class="val-op"><input type="radio" name="tipo" value="cliente" required ${v.tipo === 'cliente' ? 'checked' : ''}>
+        <span><b>👤 Cliente</b><small>O cliente paga. Fica só como aprovado.</small></span></label>
+    </div>
+    <div class="val-propria grid grid-2">
+      <div><label>Data do gasto</label><input type="date" name="data" value="${d.data || v.data || hoje()}"></div>
+      <div><label>Categoria do gasto</label><select name="categoria">${optTxt(CATEGORIAS_GASTO, d.categoria || 'Material')}</select></div>
+    </div>
+    ${o.validacao ? `<div class="row" style="margin-top:12px"><button type="button" class="btn danger sm" data-act="desfazerValidacao" data-id="${id}">Desfazer validação</button></div>` : ''}`, f => {
+    removerGastoOrc(o);
+    o.status = 'Aprovado';
+    o.validacao = { tipo: f.tipo, data: f.data || hoje() };
+    if (f.tipo === 'propria') {
+      const desp = { id: uid(), data: f.data || hoje(), valor: totalOrc(o), categoria: f.categoria || 'Material',
+        descricao: `Orçamento Nº ${o.numero} (própria)`, obraId: o.obraId || '', cidade: o.cidade || cidadeNova(), orcamentoId: o.id };
+      db.despesas.push(desp);
+      o.validacao.despesaId = desp.id;
+      toast(`Validado como própria · ${money(desp.valor)} lançado em Gastos`);
+    } else toast('Orçamento validado · pago pelo cliente');
+  }, 'Validar');
+};
+actions.desfazerValidacao = ({ id }) => {
+  const o = byId('orcamentos', id);
+  if (!o || !confirm('Desfazer a validação? Se for própria, o gasto lançado também sai de Gastos.')) return;
+  removerGastoOrc(o);
+  delete o.validacao; o.status = 'Pendente';
+  fecharModal(); salvar(); render(); toast('Validação desfeita');
 };
 
 function gravarOrc() {
@@ -804,6 +859,7 @@ function gravarOrc() {
   const cidade = byId('clientes', o.clienteId)?.cidade || o.cidade || cidadeNova();
   const reg = { id: o.id || uid(), numero: o.numero || (Math.max(0, ...db.orcamentos.map(x => x.numero)) + 1), clienteId: o.clienteId, obraId: o.obraId, cidade,
     data: o.data, validade: o.validade, status: o.status, desconto: num(o.desconto), obs: o.obs, itens };
+  if (o.validacao) { reg.validacao = o.validacao; sincronizarGastoOrc(reg); }
   const idx = db.orcamentos.findIndex(x => x.id === reg.id);
   if (idx >= 0) db.orcamentos[idx] = reg; else db.orcamentos.push(reg);
   salvar(); orcEdit = null; render(); toast('Orçamento salvo');
