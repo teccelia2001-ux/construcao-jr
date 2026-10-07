@@ -3,7 +3,7 @@ projeto: CONSTRUTORA JR
 empresa: JR Construções
 slogan: Sua obra em boas mãos
 status: em uso
-versao: 1.12.0
+versao: 1.12.1
 atualizado: 2026-10-07
 link: https://teccelia2001-ux.github.io/construcao-jr/
 repositorio: https://github.com/teccelia2001-ux/construcao-jr
@@ -19,7 +19,7 @@ tags:
 > [!info] Acesso
 > - **Link do app:** https://teccelia2001-ux.github.io/construcao-jr/
 > - **Código (GitHub):** https://github.com/teccelia2001-ux/construcao-jr
-> - **Versão atual:** `v1.12.0` (2026-10-07)
+> - **Versão atual:** `v1.12.1` (2026-10-07)
 > - **Banco de dados:** Supabase. Entrada com **e-mail e senha**.
 > - Funciona no **celular, tablet e computador**, e também **offline**.
 
@@ -54,7 +54,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 | 🌎 **Todas as cidades** | Soma todas as cidades: faturamento, gastos, saldo, a receber, comparativo e PDF |
 | 🏗️ **Obras** | Lista de obras com busca, filtro por status e andamento pelo prazo. Ficha da obra com recebimentos, gastos e orçamentos, mais o cadastro de clientes |
 | 💰 **Faturamento** | Recebimentos com totais da semana, do mês e do ano, e gráficos |
-| ⛽ **Combustível** | Vale (colaborador, posto, valor) **sem placa**, com PDF do vale e relatório |
+| ⛽ **Vale** | Vale (colaborador, posto, valor) **sem placa**, com PDF do vale e relatório |
 | 🧾 **Orçamentos** | Catálogo pré-cadastrado, itens avulsos, desconto, PDF para o WhatsApp e botão **Validar** (Própria ou Cliente) |
 | 👷 **Funcionários** | Adicionar, editar, ficha completa, ativo ou inativo e faltas (com motivo e se desconta) |
 | 💵 **Pagamentos** | Relatório da 1ª quinzena, 2ª quinzena ou do mês, com bruto, vales, valor a pagar e PDF. Botão **✔ Marcar como paga** |
@@ -171,6 +171,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 | 1.10.1 | Gasto de orçamento próprio mostra o **cliente** (na lista de Gastos e no PDF) |
 | 1.11.0 | **Acessos** de Administrador e Visualizador criados, editados e excluídos no app. PDFs largos com a folha deitada e **sem valores cortados** |
 | 1.12.0 | **Tema claro e escuro** (botão 🌙/☀️ no topo) e **vale comum**, empréstimo em dinheiro sem posto, também descontado no pagamento |
+| 1.12.1 | Aba **Combustível** renomeada para **Vale**; após marcar como paga, o **Total a pagar** conta só depois da data do pagamento |
 
 ## 📌 Pendências e ideias
 

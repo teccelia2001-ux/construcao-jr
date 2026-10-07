@@ -4,7 +4,7 @@
 // ---------- Dados ----------
 const KEY = 'construtora-jr-v1';
 // Versão do app — ao publicar mudanças, aumente aqui, no version.json e nos ?v= do index.html
-const APP_VERSION = '1.12.0';
+const APP_VERSION = '1.12.1';
 
 // ---------- Tema claro / escuro ----------
 function aplicarTema(t) {
@@ -1042,10 +1042,13 @@ function diasUteis(a, b) {
 }
 const pesoFalta = x => x.desconta === false ? 0 : (x.tipo === 'meia' ? 0.5 : 1);
 
-function folha(a, b, ateHoje = false) {
+// desde(f): data até a qual o funcionário já foi pago; se vier, só conta o que vem depois dela
+function folha(a0, b, ateHoje = false, desde = null) {
   if (ateHoje && b > hoje()) b = hoje();
-  const uteis = diasUteis(a, b);
   return C('funcionarios').filter(f => f.ativo !== false).map(f => {
+    const pagoAte = desde ? desde(f) : '';
+    const a = pagoAte && pagoAte >= a0 ? addDias(pagoAte, 1) : a0;
+    const uteis = a > b ? 0 : diasUteis(a, b);
     // considera só o período em que o funcionário estava admitido
     const adm = f.admissao || f.criadoEm || '';
     const ini = adm > a ? adm : a;
@@ -1066,8 +1069,14 @@ const ateHojeTxt = b => b > hoje() ? ` · até hoje (${br(hoje()).slice(0, 5)})`
 VIEWS.funcionarios = () => {
   const [a, b] = periodoPag();
   const linhas = folha(a, b, true);
-  const total = linhas.reduce((t, l) => t + l.liquido, 0);
-  const previsto = b > hoje() && a <= hoje() ? folha(a, b).reduce((t, l) => t + l.liquido, 0) : null;
+  // depois de marcada como paga, o "a pagar" passa a contar só a partir do dia seguinte ao pagamento
+  const pagoAte = f => pagosDe(a, b).find(p => p.cidade === f.cidade)?.ate || '';
+  const jaPago = pagosDe(a, b).length > 0;
+  const aposPg = jaPago ? [...pagosDe(a, b).map(p => p.ate)].sort().pop() : '';
+  const linhasSaldo = jaPago ? folha(a, b, true, pagoAte) : linhas;
+  const total = linhasSaldo.reduce((t, l) => t + l.liquido, 0);
+  const previsto = b > hoje() && a <= hoje() ? (jaPago ? folha(a, b, false, pagoAte) : folha(a, b)).reduce((t, l) => t + l.liquido, 0) : null;
+  const rotuloTotal = jaPago && aposPg < b ? `${br(addDias(aposPg, 1))} a ${br(b)}${ateHojeTxt(b)} · após o pagamento de ${br(aposPg).slice(0, 5)}` : `${br(a)} a ${br(b)}${ateHojeTxt(b)}`;
   const faltasPeriodo = C('faltas').filter(x => entre(x.data, a, b)).sort((x, y) => y.data.localeCompare(x.data));
   return `
   <div class="card">
@@ -1084,7 +1093,7 @@ VIEWS.funcionarios = () => {
   </div>
 
   <div class="grid grid-2">
-    <div class="stat hl"><div class="label">Total a pagar · ${br(a)} a ${br(b)}${ateHojeTxt(b)}</div><div class="value">${money(total)}</div>
+    <div class="stat hl"><div class="label">Total a pagar · ${rotuloTotal}</div><div class="value">${money(total)}</div>
       ${previsto !== null ? `<div class="sub" style="opacity:.85">Previsto até ${br(b).slice(0, 5)}: ${money(previsto)}</div>` : ''}</div>
     <div class="stat"><div class="label">Dias úteis no período</div><div class="value">${diasUteis(a, b)}</div>
       ${b > hoje() && a <= hoje() ? `<div class="sub muted">${diasUteis(a, hoje())} até hoje</div>` : ''}</div>
