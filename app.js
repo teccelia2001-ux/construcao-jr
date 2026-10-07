@@ -4,7 +4,21 @@
 // ---------- Dados ----------
 const KEY = 'construtora-jr-v1';
 // Versão do app — ao publicar mudanças, aumente aqui, no version.json e nos ?v= do index.html
-const APP_VERSION = '1.11.0';
+const APP_VERSION = '1.12.0';
+
+// ---------- Tema claro / escuro ----------
+function aplicarTema(t) {
+  document.documentElement.dataset.tema = t;
+  const b = document.getElementById('btnTema');
+  if (b) { b.textContent = t === 'claro' ? '🌙' : '☀️'; b.title = t === 'claro' ? 'Mudar para o tema escuro' : 'Mudar para o tema claro'; }
+}
+function temaAtual() { return document.documentElement.dataset.tema === 'claro' ? 'claro' : 'escuro'; }
+function trocarTema() {
+  const t = temaAtual() === 'claro' ? 'escuro' : 'claro';
+  try { localStorage.setItem('construtora-jr-v1:tema', t); } catch (e) { /* ignora */ }
+  aplicarTema(t);
+}
+aplicarTema(temaAtual());
 
 const CATALOGO_PADRAO = [
   ['material', 'Tijolo 8 furos', 'milheiro', 900],
@@ -244,11 +258,12 @@ function render() {
 }
 
 const actions = {
+  trocarTema: () => trocarTema(),
   goTab: d => { aba = d.tab; orcEdit = null; try { localStorage.setItem(KEY + ':aba', aba); } catch (e) { /* ignora */ } render(); window.scrollTo(0, 0); },
   closeModal: () => fecharModal(),
 };
 // Ações que o leitor pode usar (consultar, filtrar, gerar PDF). O resto é só do administrador.
-const ACOES_LEITOR = new Set(['goTab', 'closeModal', 'abrirCidade', 'filtroObra', 'fatAno', 'setPeriodo', 'pagTipo', 'equipeStatus',
+const ACOES_LEITOR = new Set(['goTab', 'trocarTema', 'closeModal', 'abrirCidade', 'filtroObra', 'fatAno', 'setPeriodo', 'pagTipo', 'equipeStatus',
   'verObra', 'verFunc', 'verCatalogo', 'pdfCidades', 'pdfFolha', 'pdfGastos', 'pdfVale', 'pdfVales', 'enviarOrc', 'copiarLink',
   'instalarApp', 'fecharInstalar', 'verificarAtualizacao', 'atualizarApp', 'sair']);
 document.addEventListener('click', e => {
@@ -567,9 +582,9 @@ VIEWS.combustivel = () => {
     <div class="row">${vales.length ? '<button class="btn sec" data-act="pdfVales">📄 PDF</button>' : ''}<button class="btn" data-act="novoVale">+ Novo vale</button></div></div>
   <div class="card">${vales.length ? vales.map(v => `
     <div class="list-item">
-      <span>⛽</span>
+      <span>${ehValeComum(v) ? '💵' : '⛽'}</span>
       <div class="info"><div class="title">${esc(byId('funcionarios', v.funcionarioId)?.nome || '—')}</div>
-        <div class="sub">${br(v.data)} · ${esc(byId('postos', v.postoId)?.nome || '—')}${v.obs ? ' · ' + esc(v.obs) : ''}${tagCid(v)}</div></div>
+        <div class="sub">${br(v.data)} · ${ehValeComum(v) ? 'Vale comum (dinheiro)' : esc(byId('postos', v.postoId)?.nome || '—')}${v.obs ? ' · ' + esc(v.obs) : ''}${tagCid(v)}</div></div>
       <div class="amount">${money(v.valor)}</div>
       <button class="btn ghost sm" data-act="pdfVale" data-id="${v.id}" title="Emitir vale">🧾</button>
       <button class="btn ghost sm" data-act="editVale" data-id="${v.id}">Editar</button>
@@ -617,26 +632,36 @@ function escolherCidade(c) {
 }
 changeActions.statusObra = el => { const o = byId('obras', el.dataset.id); o.status = el.value; salvar(); render(); toast(`Status da obra: ${el.value}`); };
 
+const ehValeComum = v => v.tipo === 'comum';
+changeActions.valeTipo = el => {
+  const comum = el.value === 'comum', box = document.getElementById('valePostoBox'), sel = box?.querySelector('select');
+  if (!box) return;
+  box.hidden = comum; sel.disabled = comum; sel.required = !comum;
+};
 function formVale(v = {}) {
-  const fs = C('funcionarios'), ps = C('postos');
-  if (!fs.length || !ps.length) {
-    return `<div class="empty">Para emitir vales${cidadeAtual ? ' em ' + esc(cidadeAtual) : ''}, cadastre ao menos ${!fs.length ? 'um colaborador (aba Funcionários)' : ''}${!fs.length && !ps.length ? ' e ' : ''}${!ps.length ? 'um posto' : ''}.</div>`;
+  const fs = C('funcionarios'), ps = C('postos'), comum = ehValeComum(v);
+  if (!fs.length) {
+    return `<div class="empty">Para emitir vales${cidadeAtual ? ' em ' + esc(cidadeAtual) : ''}, cadastre ao menos um colaborador (aba Funcionários).</div>`;
   }
-  return `<label>Colaborador *</label><select name="funcionarioId" required>${opt(db.funcionarios.filter(f => (daCid(f) && f.ativo !== false) || f.id === v.funcionarioId), v.funcionarioId, 'Selecione…')}</select>
-    <label>Posto *</label><select name="postoId" required>${opt(db.postos.filter(p => daCid(p) || p.id === v.postoId), v.postoId, 'Selecione…')}</select>
+  return `<label>Tipo de vale *</label><select name="tipo" data-change="valeTipo">
+      <option value="combustivel"${comum ? '' : ' selected'}>⛽ Vale combustível (em um posto)</option>
+      <option value="comum"${comum ? ' selected' : ''}>💵 Vale comum — empréstimo em dinheiro</option></select>
+    <label>Colaborador *</label><select name="funcionarioId" required>${opt(db.funcionarios.filter(f => (daCid(f) && f.ativo !== false) || f.id === v.funcionarioId), v.funcionarioId, 'Selecione…')}</select>
+    <div id="valePostoBox"${comum ? ' hidden' : ''}><label>Posto *</label><select name="postoId"${comum ? ' disabled' : ' required'}>${opt(db.postos.filter(p => daCid(p) || p.id === v.postoId), v.postoId, ps.length ? 'Selecione…' : 'Cadastre um posto abaixo da lista')}</select></div>
     <div class="grid grid-2">
       <div><label>Data *</label><input type="date" name="data" required value="${v.data || hoje()}"></div>
       <div><label>Valor do vale / adiantamento (R$) *</label><input name="valor" required inputmode="decimal" value="${v.valor ?? ''}"></div>
     </div>
-    <label>Observação</label><input name="obs" value="${esc(v.obs)}" placeholder="Ex.: ida à obra do Centro">`;
+    <label>Observação</label><input name="obs" value="${esc(v.obs)}" placeholder="Ex.: ida à obra do Centro / empréstimo para compra de material">`;
 }
-const okVale = () => C('funcionarios').length && C('postos').length;
+const okVale = () => C('funcionarios').length;
+const antesVale = d => { d.valor = num(d.valor); if (d.tipo === 'comum') d.postoId = ''; cidadeDoFunc(d); };
 // o vale fica na cidade do funcionário (é descontado no pagamento dele)
 const cidadeDoFunc = d => { d.cidade = byId('funcionarios', d.funcionarioId)?.cidade || cidadeNova(); };
-actions.novoVale = () => abrirModal('Novo vale combustível', formVale(), okVale() ? d => { d.valor = num(d.valor); cidadeDoFunc(d); db.vales.push({ id: uid(), ...d }); toast('Vale liberado'); } : null);
+actions.novoVale = () => abrirModal('Novo vale', formVale(), okVale() ? d => { antesVale(d); db.vales.push({ id: uid(), ...d }); toast('Vale liberado'); } : null);
 actions.editVale = ({ id }) => {
   const v = byId('vales', id);
-  abrirModal('Editar vale', formVale(v) + `<div class="row" style="margin-top:12px"><button type="button" class="btn danger sm" data-act="delReg" data-lista="vales" data-id="${id}">Excluir</button></div>`, d => { d.valor = num(d.valor); cidadeDoFunc(d); Object.assign(v, d); });
+  abrirModal('Editar vale', formVale(v) + `<div class="row" style="margin-top:12px"><button type="button" class="btn danger sm" data-act="delReg" data-lista="vales" data-id="${id}">Excluir</button></div>`, d => { antesVale(d); Object.assign(v, d); });
 };
 function formPosto(p = {}) {
   return `<label>Nome do posto *</label><input name="nome" required value="${esc(p.nome)}">
@@ -1506,25 +1531,25 @@ actions.pdfVales = () => {
   if (!window.jspdf) return alert('Sem internet para carregar o gerador de PDF.');
   const [a, b] = rangePor(valeRef.tipo, valeRef.data);
   const vales = C('vales').filter(v => entre(v.data, a, b)).sort((x, y) => x.data.localeCompare(y.data));
-  const doc = novoPdf('VALES COMBUSTÍVEL');
+  const doc = novoPdf('VALES');
   doc.setFontSize(10); doc.text(`Cidade: ${nomeCidade()}  ·  Período: ${br(a)} a ${br(b)}`, 14, 40);
-  doc.autoTable({ startY: 45, head: [['Data', 'Colaborador', 'Posto', 'Valor']], ...corTabela, columnStyles: colsInteiras([3]),
-    body: vales.map(v => [br(v.data), byId('funcionarios', v.funcionarioId)?.nome || '', byId('postos', v.postoId)?.nome || '', money(v.valor)]),
+  doc.autoTable({ startY: 45, head: [['Data', 'Colaborador', 'Posto / tipo', 'Valor']], ...corTabela, columnStyles: colsInteiras([3]),
+    body: vales.map(v => [br(v.data), byId('funcionarios', v.funcionarioId)?.nome || '', ehValeComum(v) ? 'Vale comum (dinheiro)' : byId('postos', v.postoId)?.nome || '', money(v.valor)]),
     foot: [[{ content: 'TOTAL', colSpan: 3 }, money(soma(vales))]], footStyles: { fillColor: [226, 236, 250], textColor: 30 } });
   rodapePdf(doc);
-  compartilharPdf(doc, `Vales_${a}_a_${b}${arqCidade()}.pdf`, undefined, `Vales combustível ${br(a)} a ${br(b)}`);
+  compartilharPdf(doc, `Vales_${a}_a_${b}${arqCidade()}.pdf`, undefined, `Vales ${br(a)} a ${br(b)}`);
 };
 actions.pdfVale = ({ id }) => {
   if (!window.jspdf) return alert('Sem internet para carregar o gerador de PDF.');
   const v = byId('vales', id), f = byId('funcionarios', v.funcionarioId) || {}, p = byId('postos', v.postoId) || {};
-  const doc = novoPdf('VALE COMBUSTÍVEL');
+  const comum = ehValeComum(v), doc = novoPdf(comum ? 'VALE COMUM — EMPRÉSTIMO' : 'VALE COMBUSTÍVEL');
   doc.setFontSize(12);
-  const linhas = [['Colaborador', f.nome || ''], ['Posto', p.nome || ''], ['Data', br(v.data)], ['Valor do vale', money(v.valor)], ['Tipo', 'Adiantamento de salário — será descontado no pagamento'], ['Observação', v.obs || '—']];
+  const linhas = [['Colaborador', f.nome || ''], ...(comum ? [] : [['Posto', p.nome || '']]), ['Data', br(v.data)], ['Valor do vale', money(v.valor)], ['Tipo', (comum ? 'Empréstimo em dinheiro' : 'Combustível') + ' — adiantamento de salário, será descontado no pagamento'], ['Observação', v.obs || '—']];
   doc.autoTable({ startY: 42, body: linhas, theme: 'grid', styles: { fontSize: 12, cellPadding: 4 }, columnStyles: { 0: { fontStyle: 'bold', cellWidth: 55, fillColor: [226, 236, 250] } } });
   const y = doc.lastAutoTable.finalY + 30;
   doc.line(20, y, 95, y); doc.line(115, y, 190, y);
   doc.setFontSize(9); doc.text('Responsável — ' + (db.config.empresa || ''), 57, y + 5, { align: 'center' }); doc.text('Colaborador', 152, y + 5, { align: 'center' });
-  compartilharPdf(doc, `Vale_${(f.nome || '').replace(/\W+/g, '_')}_${v.data}.pdf`, p.telefone || f.telefone || '', `Vale combustível liberado para ${f.nome}: ${money(v.valor)} no ${p.nome} (${br(v.data)}).`);
+  compartilharPdf(doc, `Vale_${(f.nome || '').replace(/\W+/g, '_')}_${v.data}.pdf`, comum ? (f.telefone || '') : (p.telefone || f.telefone || ''), comum ? `Vale comum (empréstimo em dinheiro) liberado para ${f.nome}: ${money(v.valor)} (${br(v.data)}).` : `Vale combustível liberado para ${f.nome}: ${money(v.valor)} no ${p.nome} (${br(v.data)}).`);
 };
 
 // =====================================================

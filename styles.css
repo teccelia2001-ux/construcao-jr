@@ -387,3 +387,40 @@ body.sem-login .topbar, body.sem-login .tabs, body.sem-login main { visibility: 
 .pago-card .info { flex: 1 1 240px; min-width: 0; }
 .pago-card .title { font-weight: 600; }
 .pago-card.ok { border-left-color: var(--ok, #22c55e); background: linear-gradient(90deg, rgba(34, 197, 94, .10), transparent 60%), var(--card); }
+
+/* Tema claro (escolhido no botão 🌙/☀️ do topo) — o cabeçalho continua azul-marinho por causa da logo */
+:root[data-tema="claro"] {
+  color-scheme: light;
+  --primary-soft: #dbe7fb;
+  --bg: #eef3fa;
+  --card: #ffffff;
+  --text: #0f2440;
+  --muted: #5a6b84;
+  --border: #cfdbec;
+  --danger: #dc2626;
+  --shadow: 0 4px 14px rgba(15, 36, 64, .10);
+}
+:root[data-tema="claro"] body { background: radial-gradient(ellipse at top, #ffffff 0%, var(--bg) 60%) fixed, var(--bg); }
+:root[data-tema="claro"] .tabs { background: rgba(238, 243, 250, .94); }
+:root[data-tema="claro"] .card,
+:root[data-tema="claro"] .stat:not(.hl) { background: #fff; }
+:root[data-tema="claro"] input,
+:root[data-tema="claro"] select,
+:root[data-tema="claro"] textarea,
+:root[data-tema="claro"] .seg,
+:root[data-tema="claro"] .chip,
+:root[data-tema="claro"] .cid-nums div,
+:root[data-tema="claro"] .val-op { background: #f6f9fe; }
+:root[data-tema="claro"] .orc-item.has { background: #e4eefc; }
+:root[data-tema="claro"] .total-bar { background: #fff; }
+:root[data-tema="claro"] .progress { background: #dbe7fb; }
+:root[data-tema="claro"] .kbd { background: #dbe7fb; }
+:root[data-tema="claro"] .btn.sec,
+:root[data-tema="claro"] .badge { color: #1d4ed8; }
+:root[data-tema="claro"] .badge.ok { color: #15803d; }
+:root[data-tema="claro"] .badge.warn { color: #b45309; }
+:root[data-tema="claro"] .modal-bg { background: rgba(15, 36, 64, .45); }
+:root[data-tema="claro"] .chip.active,
+:root[data-tema="claro"] .seg button.active { background: var(--primary); color: #fff; }
+:root[data-tema="claro"] .val-op:has(input:checked) { background: rgba(37, 99, 235, .10); }
+:root[data-tema="claro"] .pago-card.ok { background: linear-gradient(90deg, rgba(34, 197, 94, .12), transparent 60%), #fff; }
