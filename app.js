@@ -4,7 +4,7 @@
 // ---------- Dados ----------
 const KEY = 'construtora-jr-v1';
 // Versão do app — ao publicar mudanças, aumente aqui, no version.json e nos ?v= do index.html
-const APP_VERSION = '1.9.0';
+const APP_VERSION = '1.9.1';
 
 const CATALOGO_PADRAO = [
   ['material', 'Tijolo 8 furos', 'milheiro', 900],
@@ -1028,10 +1028,14 @@ function folha(a, b, ateHoje = false) {
   });
 }
 
+// texto "contado até hoje" quando o período ainda não terminou
+const ateHojeTxt = b => b > hoje() ? ` · até hoje (${br(hoje()).slice(0, 5)})` : '';
+
 VIEWS.funcionarios = () => {
   const [a, b] = periodoPag();
-  const linhas = folha(a, b);
+  const linhas = folha(a, b, true);
   const total = linhas.reduce((t, l) => t + l.liquido, 0);
+  const previsto = b > hoje() && a <= hoje() ? folha(a, b).reduce((t, l) => t + l.liquido, 0) : null;
   const faltasPeriodo = C('faltas').filter(x => entre(x.data, a, b)).sort((x, y) => y.data.localeCompare(x.data));
   return `
   <div class="card">
@@ -1048,9 +1052,12 @@ VIEWS.funcionarios = () => {
   </div>
 
   <div class="grid grid-2">
-    <div class="stat hl"><div class="label">Total a pagar · ${br(a)} a ${br(b)}</div><div class="value">${money(total)}</div></div>
-    <div class="stat"><div class="label">Dias úteis no período</div><div class="value">${diasUteis(a, b)}</div></div>
+    <div class="stat hl"><div class="label">Total a pagar · ${br(a)} a ${br(b)}${ateHojeTxt(b)}</div><div class="value">${money(total)}</div>
+      ${previsto !== null ? `<div class="sub" style="opacity:.85">Previsto até ${br(b).slice(0, 5)}: ${money(previsto)}</div>` : ''}</div>
+    <div class="stat"><div class="label">Dias úteis no período</div><div class="value">${diasUteis(a, b)}</div>
+      ${b > hoje() && a <= hoje() ? `<div class="sub muted">${diasUteis(a, hoje())} até hoje</div>` : ''}</div>
   </div>
+  <p class="muted" style="font-size:13px;margin:8px 2px 0">💡 O salário conta a partir da <b>data de admissão</b> de cada funcionário e só até <b>hoje</b>. Dias que ainda não chegaram não entram.</p>
 
   <div class="section-head"><h2>Relatório de pagamento</h2>
     <div class="row"><button class="btn sec" data-act="lancarFalta">+ Lançar falta</button>${linhas.length ? '<button class="btn wa" data-act="pdfFolha">📄 Relatório PDF</button>' : ''}</div></div>
@@ -1083,7 +1090,7 @@ const descFalta = x => `${x.tipo === 'meia' ? 'Meio dia' : 'Dia inteiro'} · ${e
 
 function resumoFunc(f, mes) {
   const [a, b] = [`${mes}-01`, `${mes}-${pad(ultimoDia(+mes.slice(0, 4), +mes.slice(5) - 1))}`];
-  const l = folha(a, b).find(x => x.f.id === f.id);
+  const l = folha(a, b, true).find(x => x.f.id === f.id);
   const faltas = db.faltas.filter(x => x.funcionarioId === f.id && entre(x.data, a, b));
   const vales = db.vales.filter(v => v.funcionarioId === f.id && entre(v.data, a, b));
   return { a, b, l, faltas, vales };
@@ -1196,7 +1203,11 @@ actions.verFunc = ({ id }) => {
   const mesAtual = `${agora.getFullYear()}-${pad(agora.getMonth() + 1)}`;
   const r = resumoFunc(f, mesAtual);
   const [qa, qb] = rangeQuinzena(hoje());
-  const lq = folha(qa, qb).find(x => x.f.id === id);
+  const lq = folha(qa, qb, true).find(x => x.f.id === id);
+  const prevQ = folha(qa, qb).find(x => x.f.id === id), prevM = folha(r.a, r.b).find(x => x.f.id === id);
+  const adm = f.admissao || f.criadoEm || '';
+  const desde = (a, b) => adm > a && adm <= b ? `desde ${br(adm).slice(0, 5)} (admissão)` : '';
+  const prevTxt = (p, l, b) => b > hoje() && p && l && p.liquido !== l.liquido ? `<div class="sub muted">previsto até ${br(b).slice(0, 5)}: ${money(p.liquido)}</div>` : '';
   const todas = db.faltas.filter(x => x.funcionarioId === id).sort((x, y) => y.data.localeCompare(x.data));
   const linha = (rot, val) => val ? `<div class="list-item"><div class="info sub">${rot}</div><div>${val}</div></div>` : '';
   abrirModal(f.nome, `
@@ -1213,8 +1224,10 @@ actions.verFunc = ({ id }) => {
     ${linha('Endereço', esc(f.endereco))}
     ${linha('Observações', esc(f.obs))}
     <div class="grid grid-2" style="margin-top:12px">
-      <div class="stat"><div class="label">Quinzena atual (${br(qa).slice(0, 5)}–${br(qb).slice(0, 5)})</div><div class="value">${money(lq ? lq.liquido : 0)}</div><div class="sub muted">${lq ? nFaltas(lq.trab) : 0} dia(s) · ${lq ? nFaltas(lq.faltas) : 0} falta(s)${lq && lq.desc ? ` · vales -${money(lq.desc)}` : ''}</div></div>
-      <div class="stat"><div class="label">${MESES[agora.getMonth()]}</div><div class="value">${money(r.l ? r.l.liquido : 0)}</div><div class="sub muted">${r.l ? nFaltas(r.l.faltas) : 0} falta(s) · vales -${money(soma(r.vales))}</div></div>
+      <div class="stat"><div class="label">Quinzena atual (${br(qa).slice(0, 5)}–${br(qb).slice(0, 5)})${ateHojeTxt(qb)}</div><div class="value">${money(lq ? lq.liquido : 0)}</div>
+        <div class="sub muted">${lq ? nFaltas(lq.trab) : 0} dia(s) · ${lq ? nFaltas(lq.faltas) : 0} falta(s)${lq && lq.desc ? ` · vales -${money(lq.desc)}` : ''}${desde(qa, qb) ? ' · ' + desde(qa, qb) : ''}</div>${prevTxt(prevQ, lq, qb)}</div>
+      <div class="stat"><div class="label">${MESES[agora.getMonth()]}${ateHojeTxt(r.b)}</div><div class="value">${money(r.l ? r.l.liquido : 0)}</div>
+        <div class="sub muted">${r.l ? nFaltas(r.l.trab) : 0} dia(s) · ${r.l ? nFaltas(r.l.faltas) : 0} falta(s) · vales -${money(soma(r.vales))}${desde(r.a, r.b) ? ' · ' + desde(r.a, r.b) : ''}</div>${prevTxt(prevM, r.l, r.b)}</div>
     </div>
     <h4 style="margin:16px 0 4px">Faltas (${todas.length})</h4>
     ${todas.length ? todas.slice(0, 30).map(x => `<div class="list-item"><div class="info"><div class="title">${br(x.data)}</div><div class="sub">${descFalta(x)}</div></div>
@@ -1268,12 +1281,12 @@ actions.delFalta = ({ id }) => { fecharModal(); confirmarExcluir('faltas', id, '
 actions.pdfFolha = () => {
   if (!window.jspdf) return alert('Sem internet para carregar o gerador de PDF.');
   const [a, b] = periodoPag();
-  const linhas = folha(a, b);
+  const linhas = folha(a, b, true);
   const [y, m] = pag.mes.split('-').map(Number);
   const nomeTipo = pag.tipo === 'mes' ? 'MENSAL' : pag.tipo === 'q1' ? '1ª QUINZENA' : '2ª QUINZENA';
   const doc = novoPdf(`PAGAMENTO ${nomeTipo}`);
   doc.setFontSize(10);
-  doc.text(`Cidade: ${nomeCidade()}  ·  Período: ${br(a)} a ${br(b)} (${MESES[m - 1]}/${y})  ·  Dias úteis: ${diasUteis(a, b)}${db.config.trabalhaSabado ? ' (seg a sáb)' : ' (seg a sex)'}`, 14, 40);
+  doc.text(`Cidade: ${nomeCidade()}  ·  Período: ${br(a)} a ${br(b)}${b > hoje() ? ' (contado até ' + br(hoje()) + ')' : ''} (${MESES[m - 1]}/${y})  ·  Dias úteis: ${diasUteis(a, b)}${db.config.trabalhaSabado ? ' (seg a sáb)' : ' (seg a sex)'}`, 14, 40);
   const head = [cidadeAtual ? 'Funcionário' : 'Funcionário (cidade)', 'Função', 'Diária', 'Dias', 'Faltas', 'Trab.', 'Bruto', 'Vales (adiant.)', 'A pagar', 'PIX'];
   const body = linhas.map(l => [l.f.nome + (cidadeAtual ? '' : ` (${l.f.cidade})`), l.f.funcao || '', money(l.f.diaria), l.dias, String(l.faltas).replace('.', ','), String(l.trab).replace('.', ','),
     money(l.bruto), l.desc ? '-' + money(l.desc) : '—', money(l.liquido), l.f.pix || '']);

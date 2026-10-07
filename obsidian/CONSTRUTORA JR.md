@@ -3,8 +3,8 @@ projeto: CONSTRUTORA JR
 empresa: JR Construções
 slogan: Sua obra em boas mãos
 status: em uso
-versao: 1.9.0
-atualizado: 2026-10-06
+versao: 1.9.1
+atualizado: 2026-10-07
 link: https://teccelia2001-ux.github.io/construcao-jr/
 repositorio: https://github.com/teccelia2001-ux/construcao-jr
 branch: claude/happy-gauss-jjrtqt
@@ -19,7 +19,7 @@ tags:
 > [!info] Acesso
 > - **Link do app:** https://teccelia2001-ux.github.io/construcao-jr/
 > - **Código (GitHub):** https://github.com/teccelia2001-ux/construcao-jr
-> - **Versão atual:** `v1.9.0` (2026-10-06)
+> - **Versão atual:** `v1.9.1` (2026-10-07)
 > - **Banco de dados:** Supabase. Entrada com **e-mail e senha**.
 > - Funciona no **celular, tablet e computador**, e também **offline**.
 
@@ -98,7 +98,9 @@ Criar um app para a construtora com **uma aba para cada item**:
 - **Faltas:**
   - Podem ser de um dia ou de um período, inteiras ou meia (meia falta = 0,5 dia).
   - **Atestado e folga** podem ser marcados para **não descontar**.
-- **Funcionário novo:** o pagamento conta a partir da **data de admissão**.
+- **Salário:** conta a partir da **data de admissão** e só **até hoje**. Dias que ainda não chegaram não entram.
+  - Na ficha do funcionário e em Pagamentos aparece também o valor **previsto até o fim** da quinzena ou do mês.
+  - Exemplo: admitido em 06/10, com diária de R$ 120. Em 07/10, a quinzena mostra **R$ 240,00** (2 dias), com previsto até 15/10 de R$ 1.080,00.
 - **PDFs:**
   - **No celular:** abre o compartilhamento do sistema para mandar pelo WhatsApp.
   - **No computador:** o arquivo é baixado direto na pasta Downloads.
@@ -143,6 +145,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 | 1.7.0 | Informações por cidade (seletor 📍 no topo) e aba **Todas as cidades** |
 | 1.8.0 | Dados no **Supabase**, login por e-mail e senha (administrador e leitor), sem backup em arquivo |
 | 1.9.0 | Botão **Validar orçamento** (Própria entra nos gastos, ou Cliente) e painéis que não fecham ao clicar fora |
+| 1.9.1 | Salário contado **da admissão até hoje**, com a previsão até o fim do período à parte |
 
 ## 📌 Pendências e ideias
 
