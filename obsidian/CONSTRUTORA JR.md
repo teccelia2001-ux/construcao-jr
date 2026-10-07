@@ -3,7 +3,7 @@ projeto: CONSTRUTORA JR
 empresa: JR Construções
 slogan: Sua obra em boas mãos
 status: em uso
-versao: 1.9.1
+versao: 1.10.0
 atualizado: 2026-10-07
 link: https://teccelia2001-ux.github.io/construcao-jr/
 repositorio: https://github.com/teccelia2001-ux/construcao-jr
@@ -19,7 +19,7 @@ tags:
 > [!info] Acesso
 > - **Link do app:** https://teccelia2001-ux.github.io/construcao-jr/
 > - **Código (GitHub):** https://github.com/teccelia2001-ux/construcao-jr
-> - **Versão atual:** `v1.9.1` (2026-10-07)
+> - **Versão atual:** `v1.10.0` (2026-10-07)
 > - **Banco de dados:** Supabase. Entrada com **e-mail e senha**.
 > - Funciona no **celular, tablet e computador**, e também **offline**.
 
@@ -43,6 +43,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 - [x] **Dados na nuvem (Supabase)** com login por e-mail e senha, nos níveis **administrador** e **leitor**.
 - [x] **Validar orçamento** como **Própria** (entra nos gastos) ou **Cliente**.
 - [x] Painéis de cadastro **não fecham ao clicar fora**.
+- [x] **Marcar quinzena ou mês como pago**.
 
 ## 🗂️ Abas do app
 
@@ -54,7 +55,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 | ⛽ **Combustível** | Vale (colaborador, posto, valor) **sem placa**, com PDF do vale e relatório |
 | 🧾 **Orçamentos** | Catálogo pré-cadastrado, itens avulsos, desconto, PDF para o WhatsApp e botão **Validar** (Própria ou Cliente) |
 | 👷 **Funcionários** | Adicionar, editar, ficha completa, ativo ou inativo e faltas (com motivo e se desconta) |
-| 💵 **Pagamentos** | Relatório da 1ª quinzena, 2ª quinzena ou do mês, com bruto, vales, valor a pagar e PDF |
+| 💵 **Pagamentos** | Relatório da 1ª quinzena, 2ª quinzena ou do mês, com bruto, vales, valor a pagar e PDF. Botão **✔ Marcar como paga** |
 | 📉 **Gastos** | Semana, quinzena e mês: mão de obra mais despesas, comparados com o faturamento |
 | 🔨 **Empreitada** | Serviços pequenos: valor, prazo, responsável e recebimentos |
 | ⚙️ **Configurações** | Dados da empresa, cidades, link, instalar app e versão |
@@ -79,6 +80,20 @@ Criar um app para a construtora com **uma aba para cada item**:
   `update public.jr_perfis set papel = 'admin' where email = 'fulano@exemplo.com';`
 - A estrutura do banco está no arquivo `supabase/banco.sql`. O endereço do projeto e a chave pública estão em `supabase-config.js`.
 - O **backup em arquivo foi retirado**, porque os dados já ficam guardados no banco.
+
+## 💵 Marcar quinzena ou mês como pago
+
+- Na aba **Pagamentos**, escolha o período (1ª quinzena, 2ª quinzena ou mês) e toque em **✔ Marcar como paga**.
+- Informe a **data do pagamento**, a **forma** (PIX, dinheiro…) e, se quiser, uma observação.
+- Se a quinzena ainda não acabou, dá para escolher entre pagar o **período inteiro** ou só **até hoje**.
+- Depois de marcado:
+  - aparece o quadro verde **✅ paga em dd/mm**, com o total;
+  - a tabela ganha a coluna **Pago**, com o valor de cada funcionário;
+  - a ficha do funcionário mostra **✅ Paga em dd/mm**;
+  - o PDF sai com **PAGO em dd/mm**.
+- Cada cidade fica registrada separadamente. Em **Todas as cidades** dá para ver o que falta pagar em cada uma.
+- Se o mês estiver aberto e uma quinzena dele já foi paga, aparece um aviso.
+- O botão **Desfazer** desmarca o pagamento.
 
 ## ✔ Validar orçamento
 
@@ -146,6 +161,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 | 1.8.0 | Dados no **Supabase**, login por e-mail e senha (administrador e leitor), sem backup em arquivo |
 | 1.9.0 | Botão **Validar orçamento** (Própria entra nos gastos, ou Cliente) e painéis que não fecham ao clicar fora |
 | 1.9.1 | Salário contado **da admissão até hoje**, com a previsão até o fim do período à parte |
+| 1.10.0 | **Marcar quinzena ou mês como pago**, com data, forma e valor de cada funcionário |
 
 ## 📌 Pendências e ideias
 

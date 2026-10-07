@@ -14,7 +14,7 @@ App web (funciona no celular e no computador, inclusive offline) para a gestão 
 | ⛽ **Combustível** | Vales para os colaboradores (colaborador, posto e valor). O vale é **adiantamento de salário** e é descontado automaticamente no pagamento. Gera o vale em PDF para assinar e o relatório do período |
 | 🧾 **Orçamentos** | Itens pré-cadastrados (tijolo, cimento, areia…), em que você só preenche a quantidade. Valor por item, itens/serviços avulsos, desconto, PDF para enviar ao cliente pelo WhatsApp. Botão **✔ Validar**: **Própria** (a construtora paga, o valor entra em Gastos) ou **Cliente** (só fica aprovado) |
 | 👷 **Funcionários** | Cadastro completo (função, diária, telefone, CPF, PIX, admissão, endereço), ficha de cada funcionário, busca, ativos e inativos, faltas de um ou vários dias, com motivo (atestado e folga podem não descontar) |
-| 💵 **Pagamentos** | Relatório **quinzenal (1ª/2ª)** ou **mensal**: dias trabalhados, faltas, valor bruto, vales descontados e valor a pagar, em PDF |
+| 💵 **Pagamentos** | Relatório **quinzenal (1ª/2ª)** ou **mensal**: dias trabalhados (da admissão até hoje), faltas, valor bruto, vales descontados e valor a pagar, em PDF. Botão **✔ Marcar como paga** registra a data, a forma e o valor pago a cada funcionário |
 | 📉 **Gastos** | Gastos da semana, quinzena e mês: mão de obra (diárias − faltas, com os vales já incluídos) + despesas lançadas, comparados com o faturamento |
 | 🔨 **Empreitada** | Obras pequenas: serviço, cliente, valor combinado, prazo, responsável e recebimentos, que entram no faturamento |
 

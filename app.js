@@ -4,7 +4,7 @@
 // ---------- Dados ----------
 const KEY = 'construtora-jr-v1';
 // Versão do app — ao publicar mudanças, aumente aqui, no version.json e nos ?v= do index.html
-const APP_VERSION = '1.9.1';
+const APP_VERSION = '1.10.0';
 
 const CATALOGO_PADRAO = [
   ['material', 'Tijolo 8 furos', 'milheiro', 900],
@@ -43,12 +43,12 @@ function estadoInicial() {
     config: { empresa: 'JR Construções', telefone: '', cnpj: '', endereco: '', trabalhaSabado: true, cidades: ['Lavras da Mangabeira'] },
     clientes: [], obras: [], receitas: [], postos: [], vales: [],
     catalogo: CATALOGO_PADRAO.map(([tipo, nome, unidade, preco]) => ({ id: uid(), tipo, nome, unidade, preco })),
-    orcamentos: [], funcionarios: [], faltas: [], despesas: [], empreitadas: [],
+    orcamentos: [], funcionarios: [], faltas: [], despesas: [], empreitadas: [], pagamentos: [],
   };
 }
 
 // Listas que pertencem a uma cidade (as faltas seguem a cidade do funcionário; o catálogo é comum a todas)
-const LISTAS_CIDADE = ['clientes', 'obras', 'receitas', 'postos', 'vales', 'orcamentos', 'funcionarios', 'despesas', 'empreitadas'];
+const LISTAS_CIDADE = ['clientes', 'obras', 'receitas', 'postos', 'vales', 'orcamentos', 'funcionarios', 'despesas', 'empreitadas', 'pagamentos'];
 
 // completa dados antigos ou de backup: cidades na config e cidade em cada registro
 function migrar(dados) {
@@ -1059,14 +1059,16 @@ VIEWS.funcionarios = () => {
   </div>
   <p class="muted" style="font-size:13px;margin:8px 2px 0">💡 O salário conta a partir da <b>data de admissão</b> de cada funcionário e só até <b>hoje</b>. Dias que ainda não chegaram não entram.</p>
 
+  ${linhas.length ? cartaoPago(a, b) : ''}
+
   <div class="section-head"><h2>Relatório de pagamento</h2>
     <div class="row"><button class="btn sec" data-act="lancarFalta">+ Lançar falta</button>${linhas.length ? '<button class="btn wa" data-act="pdfFolha">📄 Relatório PDF</button>' : ''}</div></div>
   <div class="card table-wrap">${linhas.length ? `<table>
-    <thead><tr><th>Funcionário</th><th class="num">Diária</th><th class="num">Dias</th><th class="num">Faltas</th><th class="num">Trab.</th><th class="num">Bruto</th><th class="num">Vales</th><th class="num">A pagar</th></tr></thead>
+    <thead><tr><th>Funcionário</th><th class="num">Diária</th><th class="num">Dias</th><th class="num">Faltas</th><th class="num">Trab.</th><th class="num">Bruto</th><th class="num">Vales</th><th class="num">A pagar</th>${temPago(a, b) ? '<th class="num">Pago</th>' : ''}</tr></thead>
     <tbody>${linhas.map(l => `<tr><td><b>${esc(l.f.nome)}</b><br><small class="muted">${esc(l.f.funcao || '')}${tagCid(l.f)}</small></td>
       <td class="num">${money(l.f.diaria)}</td><td class="num">${l.dias}</td><td class="num">${String(l.faltas).replace('.', ',')}</td><td class="num">${String(l.trab).replace('.', ',')}</td>
-      <td class="num">${money(l.bruto)}</td><td class="num">${l.desc ? '-' + money(l.desc) : '—'}</td><td class="num"><b ${l.liquido < 0 ? 'style="color:var(--danger)"' : ''}>${money(l.liquido)}</b></td></tr>`).join('')}</tbody>
-    <tfoot><tr><td colspan="5">Total</td><td class="num">${money(linhas.reduce((t, l) => t + l.bruto, 0))}</td><td class="num">-${money(linhas.reduce((t, l) => t + l.desc, 0))}</td><td class="num">${money(total)}</td></tr></tfoot>
+      <td class="num">${money(l.bruto)}</td><td class="num">${l.desc ? '-' + money(l.desc) : '—'}</td><td class="num"><b ${l.liquido < 0 ? 'style="color:var(--danger)"' : ''}>${money(l.liquido)}</b></td>${temPago(a, b) ? `<td class="num">${celulaPago(a, b, l.f.id)}</td>` : ''}</tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="5">Total</td><td class="num">${money(linhas.reduce((t, l) => t + l.bruto, 0))}</td><td class="num">-${money(linhas.reduce((t, l) => t + l.desc, 0))}</td><td class="num">${money(total)}</td>${temPago(a, b) ? `<td class="num">${money(soma(pagosDe(a, b), p => p.total))}</td>` : ''}</tr></tfoot>
   </table>` : '<div class="empty">Cadastre os funcionários para gerar o relatório</div>'}</div>
 
   <div class="card row">
@@ -1076,6 +1078,76 @@ VIEWS.funcionarios = () => {
 };
 
 actions.pagTipo = d => { pag.tipo = d.t; render(); };
+
+// ---------- Marcar pagamento como pago ----------
+const pagoFunc = (a, b, idFunc) => {
+  const p = db.pagamentos.find(x => x.a === a && x.b === b && x.itens.some(i => i.funcionarioId === idFunc));
+  return p ? `<div class="sub" style="color:var(--ok);margin-top:4px">✅ Paga em ${br(p.data)}: ${money(p.itens.find(i => i.funcionarioId === idFunc).valor)}</div>` : '';
+};
+// Um registro por cidade e período (1ª/2ª quinzena ou mês), com o valor pago a cada funcionário naquele momento.
+const nomePeriodo = (tipo, mes) => `${tipo === 'mes' ? 'Mês' : tipo === 'q1' ? '1ª quinzena' : '2ª quinzena'} de ${MESES[+mes.slice(5) - 1]}/${mes.slice(0, 4)}`;
+const pagosDe = (a, b) => C('pagamentos').filter(p => p.a === a && p.b === b);
+const temPago = (a, b) => pagosDe(a, b).length > 0;
+// cidades que entram no pagamento: a escolhida, ou todas as que têm funcionário ativo
+const cidadesPag = () => cidadeAtual ? [cidadeAtual] : db.config.cidades.filter(c => db.funcionarios.some(f => f.cidade === c && f.ativo !== false));
+function celulaPago(a, b, idFunc) {
+  const it = pagosDe(a, b).flatMap(p => p.itens).find(i => i.funcionarioId === idFunc);
+  return it ? `<span style="color:var(--ok)">✅ ${money(it.valor)}</span>` : '<span class="muted">—</span>';
+}
+function cartaoPago(a, b) {
+  const pagos = pagosDe(a, b), cids = cidadesPag();
+  const faltam = cids.filter(c => !pagos.some(p => p.cidade === c));
+  // períodos que se sobrepõem (ex.: mês aberto, mas a 1ª quinzena já foi paga)
+  const outros = C('pagamentos').filter(p => !(p.a === a && p.b === b) && p.a <= b && p.b >= a);
+  const avisoOutros = outros.length ? `<div class="sub muted" style="margin-top:6px">ℹ️ Já pago neste intervalo: ${[...new Set(outros.map(p => nomePeriodo(p.tipo, p.mes)))].join(', ')}.</div>` : '';
+  if (pagos.length && !faltam.length) {
+    const datas = [...new Set(pagos.map(p => br(p.data)))].join(', ');
+    return `<div class="card pago-card ok">
+      <div class="info"><div class="title">✅ ${nomePeriodo(pag.tipo, pag.mes)} paga</div>
+        <div class="sub">Paga em ${datas}${pagos[0].forma ? ' · ' + esc(pagos[0].forma) : ''} · <b>${money(soma(pagos, p => p.total))}</b>${pagos.some(p => p.parcial) ? ' · valor até ' + br(pagos[0].ate).slice(0, 5) : ''}${pagos[0].obs ? ' · ' + esc(pagos[0].obs) : ''}</div>${avisoOutros}</div>
+      <button class="btn ghost sm" data-act="desfazerPago">Desfazer</button></div>`;
+  }
+  return `<div class="card pago-card">
+    <div class="info"><div class="title">💵 ${nomePeriodo(pag.tipo, pag.mes)} · <span style="color:var(--warn)">não paga</span></div>
+      <div class="sub muted">${pagos.length ? `Já paga em ${pagos.map(p => esc(p.cidade)).join(', ')}. Falta: ${faltam.map(esc).join(', ')}.` : 'Depois de pagar os funcionários, marque aqui para ficar registrado.'}</div>${avisoOutros}</div>
+    <button class="btn" data-act="marcarPago">✔ Marcar como paga</button></div>`;
+}
+actions.marcarPago = () => {
+  const [a, b] = periodoPag();
+  const aberto = b > hoje();
+  const faltam = cidadesPag().filter(c => !pagosDe(a, b).some(p => p.cidade === c));
+  const totalAte = faltam.reduce((t, c) => t + comCidade(c, () => folha(a, b, true)).reduce((s, l) => s + l.liquido, 0), 0);
+  const totalTudo = faltam.reduce((t, c) => t + comCidade(c, () => folha(a, b)).reduce((s, l) => s + l.liquido, 0), 0);
+  abrirModal(`Marcar ${nomePeriodo(pag.tipo, pag.mes).toLowerCase()} como paga`, `
+    <p class="muted" style="margin-top:0">${br(a)} a ${br(b)}${faltam.length > 1 || !cidadeAtual ? ' · ' + faltam.map(esc).join(', ') : ''}</p>
+    ${aberto && a <= hoje() ? `<label>Valor pago</label>
+    <div class="val-opcoes">
+      <label class="val-op"><input type="radio" name="valor" value="tudo" checked><span><b>Período inteiro</b><small>até ${br(b).slice(0, 5)} · <b>${money(totalTudo)}</b></small></span></label>
+      <label class="val-op"><input type="radio" name="valor" value="ate"><span><b>Até hoje</b><small>até ${br(hoje()).slice(0, 5)} · <b>${money(totalAte)}</b></small></span></label>
+    </div>` : `<div class="stat" style="margin:6px 0"><div class="label">Total pago</div><div class="value">${money(totalTudo)}</div></div>`}
+    <div class="grid grid-2">
+      <div><label>Data do pagamento *</label><input type="date" name="data" required value="${hoje()}"></div>
+      <div><label>Forma</label><select name="forma">${optTxt(['PIX', 'Dinheiro', 'Transferência', 'Cheque'], 'PIX')}</select></div>
+    </div>
+    <label>Observação</label><input name="obs" placeholder="Ex.: pago na obra">`, f => {
+    const ateHoje = aberto && f.valor === 'ate';
+    faltam.forEach(c => {
+      const linhas = comCidade(c, () => folha(a, b, ateHoje));
+      if (!linhas.length) return;
+      db.pagamentos.push({ id: uid(), cidade: c, tipo: pag.tipo, mes: pag.mes, a, b, data: f.data, forma: f.forma, obs: f.obs,
+        parcial: ateHoje, ate: ateHoje ? hoje() : b, total: linhas.reduce((t, l) => t + l.liquido, 0),
+        itens: linhas.map(l => ({ funcionarioId: l.f.id, nome: l.f.nome, dias: l.trab, valor: l.liquido })) });
+    });
+    toast(`✅ ${nomePeriodo(pag.tipo, pag.mes)} marcada como paga`);
+  }, 'Marcar como paga');
+};
+actions.desfazerPago = () => {
+  const [a, b] = periodoPag();
+  if (!confirm(`Desmarcar o pagamento da ${nomePeriodo(pag.tipo, pag.mes).toLowerCase()}?`)) return;
+  const ids = new Set(pagosDe(a, b).map(p => p.id));
+  db.pagamentos = db.pagamentos.filter(p => !ids.has(p.id));
+  salvar(); render(); toast('Pagamento desmarcado');
+};
 changeActions.pagMes = el => { if (el.value) { pag.mes = el.value; render(); } };
 changeActions.pagSabado = el => { db.config.trabalhaSabado = el.checked; salvar(); render(); };
 
@@ -1225,7 +1297,7 @@ actions.verFunc = ({ id }) => {
     ${linha('Observações', esc(f.obs))}
     <div class="grid grid-2" style="margin-top:12px">
       <div class="stat"><div class="label">Quinzena atual (${br(qa).slice(0, 5)}–${br(qb).slice(0, 5)})${ateHojeTxt(qb)}</div><div class="value">${money(lq ? lq.liquido : 0)}</div>
-        <div class="sub muted">${lq ? nFaltas(lq.trab) : 0} dia(s) · ${lq ? nFaltas(lq.faltas) : 0} falta(s)${lq && lq.desc ? ` · vales -${money(lq.desc)}` : ''}${desde(qa, qb) ? ' · ' + desde(qa, qb) : ''}</div>${prevTxt(prevQ, lq, qb)}</div>
+        <div class="sub muted">${lq ? nFaltas(lq.trab) : 0} dia(s) · ${lq ? nFaltas(lq.faltas) : 0} falta(s)${lq && lq.desc ? ` · vales -${money(lq.desc)}` : ''}${desde(qa, qb) ? ' · ' + desde(qa, qb) : ''}</div>${prevTxt(prevQ, lq, qb)}${pagoFunc(qa, qb, id)}</div>
       <div class="stat"><div class="label">${MESES[agora.getMonth()]}${ateHojeTxt(r.b)}</div><div class="value">${money(r.l ? r.l.liquido : 0)}</div>
         <div class="sub muted">${r.l ? nFaltas(r.l.trab) : 0} dia(s) · ${r.l ? nFaltas(r.l.faltas) : 0} falta(s) · vales -${money(soma(r.vales))}${desde(r.a, r.b) ? ' · ' + desde(r.a, r.b) : ''}</div>${prevTxt(prevM, r.l, r.b)}</div>
     </div>
@@ -1302,6 +1374,12 @@ actions.pdfFolha = () => {
   if (det.length) {
     doc.setFontSize(11); doc.text('Faltas no período', 14, doc.lastAutoTable.finalY + 10);
     doc.autoTable({ startY: doc.lastAutoTable.finalY + 13, head: [['Funcionário', 'Data', 'Tipo', 'Motivo']], body: det, ...corTabela });
+  }
+  const pagos = pagosDe(a, b);
+  if (pagos.length) {
+    doc.setFontSize(11); doc.setTextColor(22, 130, 60);
+    doc.text(`PAGO em ${[...new Set(pagos.map(p => br(p.data)))].join(', ')}${pagos[0].forma ? ' (' + pagos[0].forma + ')' : ''}: ${money(soma(pagos, p => p.total))}`, 14, doc.lastAutoTable.finalY + 8);
+    doc.setTextColor(30);
   }
   rodapePdf(doc);
   compartilharPdf(doc, `Pagamento_${nomeTipo.replace(/\W+/g, '_')}_${pag.mes}${arqCidade()}.pdf`, undefined, `Relatório de pagamento ${nomeTipo.toLowerCase()} — ${br(a)} a ${br(b)}: ${money(total)}`);
