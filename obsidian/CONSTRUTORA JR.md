@@ -3,7 +3,7 @@ projeto: CONSTRUTORA JR
 empresa: JR Construções
 slogan: Sua obra em boas mãos
 status: em uso
-versao: 1.10.0
+versao: 1.10.1
 atualizado: 2026-10-07
 link: https://teccelia2001-ux.github.io/construcao-jr/
 repositorio: https://github.com/teccelia2001-ux/construcao-jr
@@ -19,7 +19,7 @@ tags:
 > [!info] Acesso
 > - **Link do app:** https://teccelia2001-ux.github.io/construcao-jr/
 > - **Código (GitHub):** https://github.com/teccelia2001-ux/construcao-jr
-> - **Versão atual:** `v1.10.0` (2026-10-07)
+> - **Versão atual:** `v1.10.1` (2026-10-07)
 > - **Banco de dados:** Supabase. Entrada com **e-mail e senha**.
 > - Funciona no **celular, tablet e computador**, e também **offline**.
 
@@ -99,6 +99,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 
 - Cada orçamento tem o botão **✔ Validar**. Ao validar, escolha quem paga:
   - **🏗️ Própria:** a construtora paga. O valor do orçamento **entra em Gastos** como despesa, na data e categoria escolhidas (padrão: Material), ligada à obra e à cidade do orçamento.
+    - Em Gastos, o lançamento aparece com o **número e o cliente**, por exemplo "Orçamento Nº 1 · Jeferson Sousa (própria)".
   - **👤 Cliente:** o cliente paga. O orçamento fica **Aprovado** e não entra nos gastos.
 - Se um orçamento validado como própria for editado, o gasto acompanha o novo valor.
 - **Desfazer validação** (no mesmo botão) ou excluir o orçamento tira o gasto de Gastos.
@@ -162,6 +163,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 | 1.9.0 | Botão **Validar orçamento** (Própria entra nos gastos, ou Cliente) e painéis que não fecham ao clicar fora |
 | 1.9.1 | Salário contado **da admissão até hoje**, com a previsão até o fim do período à parte |
 | 1.10.0 | **Marcar quinzena ou mês como pago**, com data, forma e valor de cada funcionário |
+| 1.10.1 | Gasto de orçamento próprio mostra o **cliente** (na lista de Gastos e no PDF) |
 
 ## 📌 Pendências e ideias
 

@@ -4,7 +4,7 @@
 // ---------- Dados ----------
 const KEY = 'construtora-jr-v1';
 // Versão do app — ao publicar mudanças, aumente aqui, no version.json e nos ?v= do index.html
-const APP_VERSION = '1.10.0';
+const APP_VERSION = '1.10.1';
 
 const CATALOGO_PADRAO = [
   ['material', 'Tijolo 8 furos', 'milheiro', 900],
@@ -383,7 +383,7 @@ actions.verObra = ({ id }) => {
     <h4 style="margin:16px 0 4px">Recebimentos (${recs.length})</h4>
     ${recs.length ? recs.map(r => `<div class="list-item"><div class="info"><div class="title">${esc(r.descricao || 'Recebimento')}</div><div class="sub">${br(r.data)}${r.forma ? ' · ' + esc(r.forma) : ''}</div></div><div class="amount" style="color:var(--ok)">${money(r.valor)}</div></div>`).join('') : '<div class="sub muted">Nenhum recebimento.</div>'}
     <h4 style="margin:16px 0 4px">Gastos (${desp.length})</h4>
-    ${desp.length ? desp.map(d => `<div class="list-item"><div class="info"><div class="title">${esc(d.descricao || d.categoria)}</div><div class="sub">${br(d.data)} · ${esc(d.categoria)}</div></div><div class="amount" style="color:var(--danger)">${money(d.valor)}</div></div>`).join('') : '<div class="sub muted">Nenhum gasto lançado.</div>'}
+    ${desp.length ? desp.map(d => `<div class="list-item"><div class="info"><div class="title">${esc(nomeDespesa(d))}</div><div class="sub">${br(d.data)} · ${esc(d.categoria)}</div></div><div class="amount" style="color:var(--danger)">${money(d.valor)}</div></div>`).join('') : '<div class="sub muted">Nenhum gasto lançado.</div>'}
     ${orcs.length ? `<h4 style="margin:16px 0 4px">Orçamentos</h4>${orcs.map(x => `<div class="list-item"><div class="info"><div class="title">Nº ${x.numero}</div><div class="sub">${br(x.data)} · ${esc(x.status || 'Pendente')}</div></div><div class="amount">${money(totalOrc(x))}</div></div>`).join('')}` : ''}
     <div class="row" style="margin-top:14px">
       <button type="button" class="btn" data-act="novaReceita" data-obra="${id}">+ Recebimento</button>
@@ -800,6 +800,9 @@ actions.delOrc = () => {
 // ---------- Validar orçamento ----------
 // Própria: a própria construtora paga o material/serviço → o valor entra em Gastos como despesa.
 // Cliente: o cliente paga → só fica aprovado, não entra nos gastos.
+// nome do gasto de um orçamento próprio: número + cliente (sempre atual, mesmo em gastos antigos)
+const descOrcGasto = o => `Orçamento Nº ${o.numero} · ${nomeCliente(o.clienteId)} (própria)`;
+const nomeDespesa = d => { const o = d.orcamentoId && byId('orcamentos', d.orcamentoId); return o ? descOrcGasto(o) : (d.descricao || d.categoria); };
 const despesaDoOrc = o => o?.validacao?.despesaId && db.despesas.find(d => d.id === o.validacao.despesaId);
 function removerGastoOrc(o) {
   const d = despesaDoOrc(o);
@@ -809,7 +812,7 @@ function removerGastoOrc(o) {
 function sincronizarGastoOrc(o) {
   const d = despesaDoOrc(o);
   if (o.validacao?.tipo !== 'propria' || !d) return;
-  Object.assign(d, { valor: totalOrc(o), obraId: o.obraId || '', cidade: o.cidade, descricao: `Orçamento Nº ${o.numero} (própria)` });
+  Object.assign(d, { valor: totalOrc(o), obraId: o.obraId || '', cidade: o.cidade, descricao: descOrcGasto(o) });
 }
 actions.validarOrc = ({ id }) => {
   const o = byId('orcamentos', id); if (!o) return;
@@ -834,7 +837,7 @@ actions.validarOrc = ({ id }) => {
     o.validacao = { tipo: f.tipo, data: f.data || hoje() };
     if (f.tipo === 'propria') {
       const desp = { id: uid(), data: f.data || hoje(), valor: totalOrc(o), categoria: f.categoria || 'Material',
-        descricao: `Orçamento Nº ${o.numero} (própria)`, obraId: o.obraId || '', cidade: o.cidade || cidadeNova(), orcamentoId: o.id };
+        descricao: descOrcGasto(o), obraId: o.obraId || '', cidade: o.cidade || cidadeNova(), orcamentoId: o.id };
       db.despesas.push(desp);
       o.validacao.despesaId = desp.id;
       toast(`Validado como própria · ${money(desp.valor)} lançado em Gastos`);
@@ -1436,7 +1439,7 @@ VIEWS.gastos = () => {
   <div class="section-head"><h2>Despesas lançadas</h2>
     <div class="row"><button class="btn sec" data-act="pdfGastos">📄 PDF</button><button class="btn" data-act="novaDespesa">+ Lançar despesa</button></div></div>
   <div class="card">${g.desp.length ? g.desp.sort((x, y) => y.data.localeCompare(x.data)).map(d => `
-    <div class="list-item"><div class="info"><div class="title">${esc(d.descricao || d.categoria)}</div>
+    <div class="list-item"><div class="info"><div class="title">${esc(nomeDespesa(d))}</div>
       <div class="sub">${br(d.data)} · ${esc(d.categoria)}${d.obraId ? ' · ' + esc(byId('obras', d.obraId)?.nome || '') : ''}${tagCid(d)}</div></div>
       <div class="amount" style="color:var(--danger)">${money(d.valor)}</div>
       <button class="btn ghost sm" data-act="editDespesa" data-id="${d.id}">Editar</button></div>`).join('') : '<div class="empty">Nenhuma despesa no período</div>'}</div>
@@ -1488,7 +1491,7 @@ actions.pdfGastos = () => {
       ['Faturamento no período', money(fat)], [{ content: 'Saldo', styles: { fontStyle: 'bold' } }, { content: money(fat - g.total), styles: { fontStyle: 'bold' } }]] });
   if (g.desp.length) {
     doc.autoTable({ startY: doc.lastAutoTable.finalY + 8, head: [['Data', 'Descrição', 'Categoria', 'Obra', 'Valor']], ...corTabela, columnStyles: { 4: { halign: 'right' } },
-      body: g.desp.map(d => [br(d.data), d.descricao || '', d.categoria, byId('obras', d.obraId)?.nome || '', money(d.valor)]) });
+      body: g.desp.map(d => [br(d.data), nomeDespesa(d), d.categoria, byId('obras', d.obraId)?.nome || '', money(d.valor)]) });
   }
   rodapePdf(doc);
   compartilharPdf(doc, `Gastos_${a}_a_${b}${arqCidade()}.pdf`, undefined, `Relatório de gastos ${br(a)} a ${br(b)}`);
