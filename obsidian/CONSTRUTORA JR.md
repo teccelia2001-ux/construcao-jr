@@ -44,7 +44,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 - [x] **Validar orçamento** como **Própria** (entra nos gastos) ou **Cliente**.
 - [x] Painéis de cadastro **não fecham ao clicar fora**.
 - [x] **Marcar quinzena ou mês como pago**.
-- [x] **Acessos:** criar, editar e excluir **Administrador** e **Visualizador** dentro do app.
+- [x] **Acessos:** criar, editar e excluir **Administrador** e **Visualizador** dentro do app. O `supabase/acessos.sql` já foi rodado no Supabase (07/10/2026).
 - [x] **PDFs sem valores cortados**: os relatórios largos saem com a folha deitada.
 
 ## 🗂️ Abas do app
@@ -82,7 +82,7 @@ Criar um app para a construtora com **uma aba para cada item**:
   - **Editar:** muda o nome, o tipo (Administrador ou Visualizador) ou a senha.
   - **Excluir:** a pessoa deixa de conseguir entrar.
   - Proteções: ninguém exclui o próprio acesso, e sempre fica pelo menos um administrador.
-- ⚠️ **Para os acessos funcionarem**, o arquivo `supabase/acessos.sql` precisa ser rodado **uma vez** no Supabase (SQL Editor → New query → colar → Run). Enquanto não for rodado, ⚙️ → Acessos mostra esse passo a passo.
+- ✅ O arquivo `supabase/acessos.sql` já foi rodado no Supabase, em 07/10/2026. Se um dia o banco for recriado, é preciso rodar `banco.sql` e depois `acessos.sql` de novo.
 - A estrutura do banco está no arquivo `supabase/banco.sql`. O endereço do projeto e a chave pública estão em `supabase-config.js`.
 - O **backup em arquivo foi retirado**, porque os dados já ficam guardados no banco.
 
@@ -173,7 +173,6 @@ Criar um app para a construtora com **uma aba para cada item**:
 
 ## 📌 Pendências e ideias
 
-- [ ] **Rodar `supabase/acessos.sql` no Supabase** (uma vez) para liberar a tela de Acessos.
 - [ ] **Link mais curto:** mostrar só "CONSTRUTORA JR" em vez de `teccelia2001-ux.github.io/construcao-jr`. Há três caminhos:
   - [ ] **Domínio próprio**, por exemplo `construtorajr.com.br`. Custa cerca de R$ 40 por ano no registro.br. Exige configurar o DNS e o GitHub Pages.
   - [ ] **Link curto grátis**, por exemplo `tinyurl.com/construtorajr`. Ele só redireciona para o link longo.
