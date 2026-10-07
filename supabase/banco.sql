@@ -58,5 +58,6 @@ drop policy if exists jr_perfis_ler on public.jr_perfis;
 create policy jr_perfis_ler on public.jr_perfis for select to authenticated
   using (user_id = auth.uid() or public.jr_papel() = 'admin');
 
--- Para tornar alguém administrador (ou voltar a leitor):
+-- Para criar, editar e excluir acessos pelo app, rode também o arquivo acessos.sql.
+-- Para tornar alguém administrador (ou voltar a leitor) direto no banco:
 --   update public.jr_perfis set papel = 'admin' where email = 'fulano@exemplo.com';

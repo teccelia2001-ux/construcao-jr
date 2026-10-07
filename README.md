@@ -2,7 +2,7 @@
 
 > Sua obra em boas mãos
 
-App web (funciona no celular e no computador, inclusive offline) para a gestão da construtora. Os dados ficam no banco (Supabase) e o acesso é por e-mail e senha, com dois níveis: **administrador** (lança e altera) e **leitor** (só consulta). Veja `supabase/banco.sql` para montar o banco.
+App web (funciona no celular e no computador, inclusive offline) para a gestão da construtora. Os dados ficam no banco (Supabase) e o acesso é por e-mail e senha, com dois níveis: **administrador** (lança e altera) e **leitor** (só consulta). Veja `supabase/banco.sql` para montar o banco e rode também `supabase/acessos.sql` (uma vez, no SQL Editor) para o administrador poder criar, editar e excluir acessos em ⚙️ → Acessos.
 
 ## Abas
 

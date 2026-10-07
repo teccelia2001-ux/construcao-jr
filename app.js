@@ -4,7 +4,7 @@
 // ---------- Dados ----------
 const KEY = 'construtora-jr-v1';
 // Versão do app — ao publicar mudanças, aumente aqui, no version.json e nos ?v= do index.html
-const APP_VERSION = '1.10.1';
+const APP_VERSION = '1.11.0';
 
 const CATALOGO_PADRAO = [
   ['material', 'Tijolo 8 furos', 'milheiro', 900],
@@ -904,12 +904,13 @@ let logoPdf = null; // logo em base64 para o cabeçalho dos PDFs
 fetch('img/logo-pdf.jpg').then(r => r.blob()).then(b => new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(b); }))
   .then(d => (logoPdf = d)).catch(() => {});
 
-function novoPdf(titulo) {
+// paisagem = folha deitada, para tabelas com muitas colunas
+function novoPdf(titulo, paisagem = false) {
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  const c = db.config;
-  doc.setFillColor(6, 26, 46); doc.rect(0, 0, 210, 32, 'F');
-  doc.setFillColor(37, 99, 235); doc.rect(0, 32, 210, 1.2, 'F');
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: paisagem ? 'landscape' : 'portrait' });
+  const c = db.config, W = doc.internal.pageSize.getWidth();
+  doc.setFillColor(6, 26, 46); doc.rect(0, 0, W, 32, 'F');
+  doc.setFillColor(37, 99, 235); doc.rect(0, 32, W, 1.2, 'F');
   let x = 14;
   if (logoPdf) { doc.addImage(logoPdf, 'JPEG', 10, 3, 40, 25.7); x = 55; }
   doc.setTextColor(255); doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
@@ -919,7 +920,7 @@ function novoPdf(titulo) {
   if (info) doc.text(info, x, 19);
   if (c.endereco) doc.text(c.endereco, x, 24);
   doc.setTextColor(255); doc.setFontSize(12); doc.setFont('helvetica', 'bold');
-  doc.text(titulo, 196, 13, { align: 'right' });
+  doc.text(titulo, W - 14, 13, { align: 'right' });
   doc.setTextColor(30); doc.setFont('helvetica', 'normal');
   return doc;
 }
@@ -927,10 +928,13 @@ function rodapePdf(doc) {
   const n = doc.getNumberOfPages();
   for (let i = 1; i <= n; i++) {
     doc.setPage(i); doc.setFontSize(8); doc.setTextColor(140);
-    doc.text(`Gerado em ${new Date().toLocaleString('pt-BR')} · Página ${i} de ${n}`, 105, 290, { align: 'center' });
+    const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+    doc.text(`Gerado em ${new Date().toLocaleString('pt-BR')} · Página ${i} de ${n}`, W / 2, H - 7, { align: 'center' });
   }
 }
 const corTabela = { headStyles: { fillColor: [11, 39, 68] }, styles: { fontSize: 9 }, alternateRowStyles: { fillColor: [240, 245, 252] } };
+// colunas de valor nunca quebram linha (R$ 5.206,00 fica inteiro); 'dir' alinha à direita, 'meio' centraliza
+const colsInteiras = (dir = [], meio = []) => Object.fromEntries([...dir.map(i => [i, { halign: 'right', cellWidth: 'wrap' }]), ...meio.map(i => [i, { halign: 'center', cellWidth: 'wrap' }])]);
 
 // Celular/tablet: abre o compartilhamento (WhatsApp etc.). Computador: baixa o PDF direto.
 const ehCelular = () => (navigator.userAgentData && navigator.userAgentData.mobile) ||
@@ -975,7 +979,7 @@ function enviarPdfOrc(o) {
   doc.autoTable({
     startY: y + 2, head: [['Descrição', 'Unid.', 'Qtd', 'Valor unit.', 'Total']], body, foot, ...corTabela,
     footStyles: { fillColor: [255, 255, 255], textColor: 30, fontStyle: 'bold' },
-    columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } },
+    columnStyles: colsInteiras([2, 3, 4]),
   });
   let fy = doc.lastAutoTable.finalY + 10;
   if (o.obs) {
@@ -1359,7 +1363,7 @@ actions.pdfFolha = () => {
   const linhas = folha(a, b, true);
   const [y, m] = pag.mes.split('-').map(Number);
   const nomeTipo = pag.tipo === 'mes' ? 'MENSAL' : pag.tipo === 'q1' ? '1ª QUINZENA' : '2ª QUINZENA';
-  const doc = novoPdf(`PAGAMENTO ${nomeTipo}`);
+  const doc = novoPdf(`PAGAMENTO ${nomeTipo}`, true);
   doc.setFontSize(10);
   doc.text(`Cidade: ${nomeCidade()}  ·  Período: ${br(a)} a ${br(b)}${b > hoje() ? ' (contado até ' + br(hoje()) + ')' : ''} (${MESES[m - 1]}/${y})  ·  Dias úteis: ${diasUteis(a, b)}${db.config.trabalhaSabado ? ' (seg a sáb)' : ' (seg a sex)'}`, 14, 40);
   const head = [cidadeAtual ? 'Funcionário' : 'Funcionário (cidade)', 'Função', 'Diária', 'Dias', 'Faltas', 'Trab.', 'Bruto', 'Vales (adiant.)', 'A pagar', 'PIX'];
@@ -1369,7 +1373,8 @@ actions.pdfFolha = () => {
   const cols = head.length;
   doc.autoTable({
     startY: 45, head: [head], body, ...corTabela,
-    foot: [[{ content: 'TOTAL', colSpan: cols - 2 }, money(total), '']],
+    columnStyles: { 0: { cellWidth: 'auto' }, ...colsInteiras([2, 6, 7, 8], [3, 4, 5]) },
+    foot: [[{ content: 'TOTAL', colSpan: cols - 2 }, { content: money(total), styles: { halign: 'right' } }, '']],
     footStyles: { fillColor: [226, 236, 250], textColor: 30, fontStyle: 'bold' },
   });
   // detalhamento das faltas
@@ -1485,12 +1490,12 @@ actions.pdfGastos = () => {
   const fat = soma(C('receitas').filter(r => entre(r.data, a, b)));
   const doc = novoPdf('RELATÓRIO DE GASTOS');
   doc.setFontSize(10); doc.text(`Cidade: ${nomeCidade()}  ·  Período: ${br(a)} a ${br(b)}`, 14, 40);
-  doc.autoTable({ startY: 45, head: [['Resumo', 'Valor']], ...corTabela, columnStyles: { 1: { halign: 'right' } },
+  doc.autoTable({ startY: 45, head: [['Resumo', 'Valor']], ...corTabela, columnStyles: colsInteiras([1]),
     body: [['Mão de obra (diárias − faltas)', money(g.folha)], ['   (já adiantado em vales)', money(g.vales)], ...Object.entries(g.porCat).map(([c, v]) => [c, money(v)]),
       [{ content: 'Total de gastos', styles: { fontStyle: 'bold' } }, { content: money(g.total), styles: { fontStyle: 'bold' } }],
       ['Faturamento no período', money(fat)], [{ content: 'Saldo', styles: { fontStyle: 'bold' } }, { content: money(fat - g.total), styles: { fontStyle: 'bold' } }]] });
   if (g.desp.length) {
-    doc.autoTable({ startY: doc.lastAutoTable.finalY + 8, head: [['Data', 'Descrição', 'Categoria', 'Obra', 'Valor']], ...corTabela, columnStyles: { 4: { halign: 'right' } },
+    doc.autoTable({ startY: doc.lastAutoTable.finalY + 8, head: [['Data', 'Descrição', 'Categoria', 'Obra', 'Valor']], ...corTabela, columnStyles: colsInteiras([4]),
       body: g.desp.map(d => [br(d.data), nomeDespesa(d), d.categoria, byId('obras', d.obraId)?.nome || '', money(d.valor)]) });
   }
   rodapePdf(doc);
@@ -1503,7 +1508,7 @@ actions.pdfVales = () => {
   const vales = C('vales').filter(v => entre(v.data, a, b)).sort((x, y) => x.data.localeCompare(y.data));
   const doc = novoPdf('VALES COMBUSTÍVEL');
   doc.setFontSize(10); doc.text(`Cidade: ${nomeCidade()}  ·  Período: ${br(a)} a ${br(b)}`, 14, 40);
-  doc.autoTable({ startY: 45, head: [['Data', 'Colaborador', 'Posto', 'Valor']], ...corTabela, columnStyles: { 3: { halign: 'right' } },
+  doc.autoTable({ startY: 45, head: [['Data', 'Colaborador', 'Posto', 'Valor']], ...corTabela, columnStyles: colsInteiras([3]),
     body: vales.map(v => [br(v.data), byId('funcionarios', v.funcionarioId)?.nome || '', byId('postos', v.postoId)?.nome || '', money(v.valor)]),
     foot: [[{ content: 'TOTAL', colSpan: 3 }, money(soma(vales))]], footStyles: { fillColor: [226, 236, 250], textColor: 30 } });
   rodapePdf(doc);
@@ -1691,14 +1696,15 @@ actions.pdfCidades = () => {
   const [a, b] = rangePor(cidRef.tipo, cidRef.data);
   const linhas = db.config.cidades.map(c => resumoCidade(c, a, b));
   const t = resumoCidade('', a, b);
-  const doc = novoPdf('RESUMO POR CIDADE');
+  const doc = novoPdf('RESUMO POR CIDADE', true);
   doc.setFontSize(10); doc.text(`Todas as cidades  ·  Período: ${br(a)} a ${br(b)}`, 14, 40);
   const lin = l => [l.cid, money(l.fat), money(l.maoObra), money(l.despesas), money(l.gastos), money(l.saldo), money(l.aReceber), `${l.obras} / ${l.emp}`, l.func];
   doc.autoTable({
     startY: 45, ...corTabela, head: [['Cidade', 'Faturamento', 'Mão de obra', 'Despesas', 'Gastos', 'Saldo', 'A receber', 'Obras/Empr.', 'Func.']],
-    body: linhas.map(lin), foot: [lin({ ...t, cid: 'TOTAL' })],
+    body: linhas.map(lin), foot: [lin({ ...t, cid: 'TOTAL' }).map((v, i) => ({ content: v, styles: { halign: i === 0 ? 'left' : i >= 7 ? 'center' : 'right' } }))],
     footStyles: { fillColor: [226, 236, 250], textColor: 30, fontStyle: 'bold' },
-    columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'center' }, 8: { halign: 'center' } },
+    columnStyles: { 0: { cellWidth: 'auto' }, ...colsInteiras([1, 2, 3, 4, 5, 6], [7, 8]) },
+    headStyles: { ...corTabela.headStyles, halign: 'center' },
   });
   rodapePdf(doc);
   compartilharPdf(doc, `Resumo_cidades_${a}_a_${b}.pdf`, undefined, `Resumo de todas as cidades ${br(a)} a ${br(b)}: faturamento ${money(t.fat)}, gastos ${money(t.gastos)}, saldo ${money(t.saldo)}`);
@@ -1743,6 +1749,82 @@ actions.excluirCidade = ({ c }) => {
 // =====================================================
 // CONFIGURAÇÕES / BACKUP
 // =====================================================
+// =====================================================
+// ACESSOS (administrador cria, edita e exclui) — funções do supabase/acessos.sql
+// =====================================================
+const PAPEIS = { admin: 'Administrador', leitor: 'Visualizador' };
+const DESC_PAPEL = { admin: 'Pode lançar, alterar e excluir', leitor: 'Só consegue ver, não altera nada' };
+let acessos = [];
+const semFuncoesAcesso = e => /jr_listar_acessos|jr_criar_acesso|jr_editar_acesso|jr_excluir_acesso|PGRST202|42883|Could not find the function/i.test(`${e?.code} ${e?.message}`);
+const avisoSql = `<div class="empty" style="text-align:left">⚙️ Para criar e editar acessos pelo app, falta um passo no Supabase (uma vez só):
+  <ol class="passos"><li>Abra o projeto no <b>Supabase</b> → <b>SQL Editor</b> → <b>New query</b>.</li>
+  <li>Cole todo o conteúdo do arquivo <b>supabase/acessos.sql</b> (no GitHub do projeto) e clique em <b>Run</b>.</li>
+  <li>Volte aqui e abra ⚙️ de novo.</li></ol></div>`;
+const erroAcesso = e => semFuncoesAcesso(e) ? 'Falta rodar o arquivo supabase/acessos.sql no Supabase.' : (e?.message || 'Não foi possível concluir. Verifique a internet.');
+
+async function carregarAcessos() {
+  const box = document.getElementById('acessosBox'); if (!box) return;
+  const { data, error } = await sb.rpc('jr_listar_acessos');
+  if (!document.getElementById('acessosBox')) return;
+  if (error) { box.innerHTML = semFuncoesAcesso(error) ? avisoSql : `<div class="empty">${esc(erroAcesso(error))}</div>`; return; }
+  acessos = data || [];
+  const fmt = t => t ? new Date(t).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'nunca entrou';
+  box.innerHTML = acessos.map(a => `<div class="list-item func-item">
+      <div class="avatar">${esc((a.nome || a.email).trim().split(/[\s@.]+/).map(p => p[0]).slice(0, 2).join('').toUpperCase())}</div>
+      <div class="info"><div class="title">${esc(a.nome || a.email)}${a.user_id === usuario.id ? ' <span class="badge gray">você</span>' : ''}</div>
+        <div class="sub">${a.nome ? esc(a.email) + ' · ' : ''}<span class="badge ${a.papel === 'admin' ? '' : 'ok'}">${PAPEIS[a.papel] || a.papel}</span></div>
+        <div class="sub muted">Último acesso: ${fmt(a.ultimo_acesso)}</div></div>
+      <div class="row func-btns" style="justify-content:flex-end">
+        <button class="btn ghost sm" data-act="editAcesso" data-id="${a.user_id}">Editar</button>
+        ${a.user_id !== usuario.id ? `<button class="btn danger sm" data-act="delAcesso" data-id="${a.user_id}">Excluir</button>` : ''}
+      </div></div>`).join('') +
+    `<p class="muted" style="font-size:13px;margin-bottom:0"><b>Administrador:</b> ${DESC_PAPEL.admin.toLowerCase()}. <b>Visualizador:</b> ${DESC_PAPEL.leitor.toLowerCase()}.</p>`;
+}
+function formAcesso(a = {}) {
+  const novo = !a.user_id;
+  return `${novo ? `<label>E-mail *</label><input name="email" type="email" required autocomplete="off" inputmode="email" placeholder="pessoa@exemplo.com">`
+      : `<label>E-mail</label><input value="${esc(a.email)}" disabled>`}
+    <label>Nome</label><input name="nome" value="${esc(a.nome)}" placeholder="Ex.: Maria (escritório)">
+    <label>Tipo de acesso *</label>
+    <div class="val-opcoes">
+      ${['admin', 'leitor'].map(p => `<label class="val-op"><input type="radio" name="papel" value="${p}" required ${(a.papel || 'leitor') === p ? 'checked' : ''}>
+        <span><b>${p === 'admin' ? '🛠️' : '👁️'} ${PAPEIS[p]}</b><small>${DESC_PAPEL[p]}</small></span></label>`).join('')}
+    </div>
+    <label>${novo ? 'Senha *' : 'Nova senha (deixe em branco para manter)'}</label>
+    <input name="senha" type="text" ${novo ? 'required' : ''} minlength="6" autocomplete="new-password" placeholder="mínimo 6 caracteres">
+    <p class="muted" style="font-size:12.5px;margin:6px 0 0">${novo ? 'Passe o e-mail e a senha para a pessoa. Ela entra no app com eles.' : 'Se trocar a senha, avise a pessoa.'}</p>`;
+}
+// executa no banco, mantém o painel aberto se der erro
+async function acaoAcesso(promessa, ok) {
+  const btn = document.querySelector('#modalForm button[type=submit]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Salvando…'; }
+  const { error } = await promessa;
+  if (error) { alert(erroAcesso(error)); if (btn) { btn.disabled = false; btn.textContent = 'Salvar'; } return false; }
+  fecharModal(); toast(ok); carregarAcessos();
+  return true;
+}
+actions.novoAcesso = () => abrirModal('Novo acesso', formAcesso(), d => {
+  acaoAcesso(sb.rpc('jr_criar_acesso', { p_email: d.email.trim(), p_senha: d.senha, p_nome: d.nome || '', p_papel: d.papel }), `Acesso criado para ${d.email.trim()}`);
+  return false;
+});
+actions.editAcesso = ({ id }) => {
+  const a = acessos.find(x => x.user_id === id); if (!a) return;
+  abrirModal(`Editar acesso`, formAcesso(a), d => {
+    if (d.senha && d.senha.length < 6) { alert('A senha precisa ter pelo menos 6 caracteres.'); return false; }
+    if (id === usuario.id && d.papel !== 'admin' && !confirm('Você vai deixar de ser administrador e não poderá mais alterar nada. Continuar?')) return false;
+    acaoAcesso(sb.rpc('jr_editar_acesso', { p_user: id, p_nome: d.nome || '', p_papel: d.papel, p_senha: d.senha || '' }), 'Acesso atualizado')
+      .then(ok => { if (ok && id === usuario.id && d.papel !== 'admin') location.reload(); });
+    return false;
+  });
+};
+actions.delAcesso = async ({ id }) => {
+  const a = acessos.find(x => x.user_id === id); if (!a) return;
+  if (!confirm(`Excluir o acesso de ${a.nome || a.email}? A pessoa não vai conseguir mais entrar no app.`)) return;
+  const { error } = await sb.rpc('jr_excluir_acesso', { p_user: id });
+  if (error) return alert(erroAcesso(error));
+  toast('Acesso excluído'); carregarAcessos();
+};
+
 VIEWS.config = () => `
   <div class="section-head mt0"><h2>Dados da empresa</h2></div>
   <div class="card"><form id="cfgForm">
@@ -1762,10 +1844,12 @@ VIEWS.config = () => `
 
   <div class="section-head"><h2>Minha conta</h2></div>
   <div class="card">
-    <div class="list-item"><div class="info"><div class="title">${esc(usuario?.email || '')}</div><div class="sub">${ehAdmin() ? 'Administrador — pode lançar e alterar' : 'Leitor — só consulta'}</div></div>
+    <div class="list-item"><div class="info"><div class="title">${esc(usuario?.email || '')}</div><div class="sub">${ehAdmin() ? 'Administrador — pode lançar e alterar' : 'Visualizador — só consulta'}</div></div>
     <button class="btn sec sm" data-act="sair">Sair</button></div>
     <p class="muted" style="font-size:13px;margin-bottom:0">Os dados ficam guardados no banco e aparecem iguais em qualquer aparelho em que você entrar com seu e-mail e senha.</p>
   </div>
+  ${ehAdmin() ? `<div class="section-head"><h2>Acessos</h2><button class="btn" data-act="novoAcesso">+ Novo acesso</button></div>
+  <div class="card" id="acessosBox"><div class="empty">Carregando acessos…</div></div>` : ''}
   <div class="section-head"><h2>Acesso pelo celular</h2></div>
   <div class="card">
     <div class="link-box"><input readonly value="${esc(location.href.split('#')[0].split('?')[0])}" id="linkApp"><button class="btn sec" data-act="copiarLink">Copiar</button></div>
@@ -1787,6 +1871,7 @@ VIEWS.config = () => `
 
 POS.config = () => {
   verificarVersao();
+  if (ehAdmin()) carregarAcessos();
   document.getElementById('cfgForm').addEventListener('submit', e => {
     e.preventDefault();
     if (!ehAdmin()) return toast('Seu acesso é somente leitura');
