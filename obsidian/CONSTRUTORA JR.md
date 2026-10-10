@@ -3,8 +3,8 @@ projeto: CONSTRUTORA JR
 empresa: JR Construções
 slogan: Sua obra em boas mãos
 status: em uso
-versao: 1.12.1
-atualizado: 2026-10-07
+versao: 1.13.0
+atualizado: 2026-10-10
 link: https://teccelia2001-ux.github.io/construcao-jr/
 repositorio: https://github.com/teccelia2001-ux/construcao-jr
 branch: claude/happy-gauss-jjrtqt
@@ -19,7 +19,7 @@ tags:
 > [!info] Acesso
 > - **Link do app:** https://teccelia2001-ux.github.io/construcao-jr/
 > - **Código (GitHub):** https://github.com/teccelia2001-ux/construcao-jr
-> - **Versão atual:** `v1.12.1` (2026-10-07)
+> - **Versão atual:** `v1.13.0` (2026-10-10)
 > - **Banco de dados:** Supabase. Entrada com **e-mail e senha**.
 > - Funciona no **celular, tablet e computador**, e também **offline**.
 
@@ -148,6 +148,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 
 - Azul-marinho com detalhes em azul e prata, nas cores da logo.
 - A logo aparece no topo, na tela de abertura, como marca-d'água no fundo, no ícone do celular e no cabeçalho dos PDFs.
+- [x] Responsivo para celular: nada estoura a tela; no celular as tabelas viram cartões e os botões Salvar/Cancelar dos painéis ficam sempre à vista.
 
 ## 🕓 Histórico de versões
 
@@ -172,6 +173,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 | 1.11.0 | **Acessos** de Administrador e Visualizador criados, editados e excluídos no app. PDFs largos com a folha deitada e **sem valores cortados** |
 | 1.12.0 | **Tema claro e escuro** (botão 🌙/☀️ no topo) e **vale comum**, empréstimo em dinheiro sem posto, também descontado no pagamento |
 | 1.12.1 | Aba **Combustível** renomeada para **Vale**; após marcar como paga, o **Total a pagar** conta só depois da data do pagamento |
+| 1.13.0 | **Responsivo para celular:** topo mais baixo com o nome da cidade inteiro, abas menores, números 2 por linha, tabelas de Pagamentos e Todas as cidades viram cartões, botões Salvar/Cancelar sempre visíveis nos painéis; nome da cidade aparece no tema claro |
 
 ## 📌 Pendências e ideias
 

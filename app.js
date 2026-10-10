@@ -4,7 +4,7 @@
 // ---------- Dados ----------
 const KEY = 'construtora-jr-v1';
 // Versão do app — ao publicar mudanças, aumente aqui, no version.json e nos ?v= do index.html
-const APP_VERSION = '1.12.1';
+const APP_VERSION = '1.13.0';
 
 // ---------- Tema claro / escuro ----------
 function aplicarTema(t) {
@@ -255,6 +255,29 @@ function render() {
   const v = document.getElementById('view');
   v.innerHTML = (VIEWS[aba] || VIEWS.agenda)();
   if (POS[aba]) POS[aba]();
+  rotularTabelas(v); alargarSozinhos(v);
+  document.querySelector('#tabs button.active')?.scrollIntoView({ block: 'nearest', inline: 'center' });
+}
+
+// No celular os números ficam 2 por linha; o destaque e o que sobraria sozinho ocupam a linha toda
+function alargarSozinhos(raiz) {
+  raiz.querySelectorAll('.grid-3').forEach(g => {
+    let seq = [];
+    const fecha = () => { if (seq.length % 2) seq[seq.length - 1].classList.add('larga'); seq = []; };
+    [...g.children].forEach(el => el.classList.contains('hl') ? fecha() : seq.push(el));
+    fecha();
+  });
+}
+
+// No celular as tabelas viram cartões: cada célula ganha o nome da sua coluna (usado pelo CSS)
+function rotularTabelas(raiz) {
+  raiz.querySelectorAll('table').forEach(t => {
+    const nomes = [...t.querySelectorAll('thead th')].map(th => th.textContent.trim());
+    t.querySelectorAll('tbody tr, tfoot tr').forEach(tr => {
+      let col = 0;
+      [...tr.cells].forEach(td => { td.dataset.l = td.colSpan > 1 ? '' : nomes[col] || ''; col += td.colSpan; });
+    });
+  });
 }
 
 const actions = {
@@ -1104,7 +1127,7 @@ VIEWS.funcionarios = () => {
 
   <div class="section-head"><h2>Relatório de pagamento</h2>
     <div class="row"><button class="btn sec" data-act="lancarFalta">+ Lançar falta</button>${linhas.length ? '<button class="btn wa" data-act="pdfFolha">📄 Relatório PDF</button>' : ''}</div></div>
-  <div class="card table-wrap">${linhas.length ? `<table>
+  <div class="card table-wrap">${linhas.length ? `<table class="tcard">
     <thead><tr><th>Funcionário</th><th class="num">Diária</th><th class="num">Dias</th><th class="num">Faltas</th><th class="num">Trab.</th><th class="num">Bruto</th><th class="num">Vales</th><th class="num">A pagar</th>${temPago(a, b) ? '<th class="num">Pago</th>' : ''}</tr></thead>
     <tbody>${linhas.map(l => `<tr><td><b>${esc(l.f.nome)}</b><br><small class="muted">${esc(l.f.funcao || '')}${tagCid(l.f)}</small></td>
       <td class="num">${money(l.f.diaria)}</td><td class="num">${l.dias}</td><td class="num">${String(l.faltas).replace('.', ',')}</td><td class="num">${String(l.trab).replace('.', ',')}</td>
@@ -1706,7 +1729,7 @@ VIEWS.cidades = () => {
   <div class="section-head"><h2>Comparativo entre cidades</h2></div>
   <div class="card"><div class="chart-box"><canvas id="chCidades"></canvas></div></div>
 
-  <div class="card table-wrap"><table>
+  <div class="card table-wrap"><table class="tcard">
     <thead><tr><th>Cidade</th><th class="num">Faturamento</th><th class="num">Mão de obra</th><th class="num">Despesas</th><th class="num">Gastos</th><th class="num">Saldo</th><th class="num">A receber</th></tr></thead>
     <tbody>${linhas.map(l => `<tr><td><b>${esc(l.cid)}</b></td><td class="num">${money(l.fat)}</td><td class="num">${money(l.maoObra)}</td><td class="num">${money(l.despesas)}</td><td class="num">${money(l.gastos)}</td><td class="num"><b ${cor(l.saldo)}>${money(l.saldo)}</b></td><td class="num">${money(l.aReceber)}</td></tr>`).join('')}</tbody>
     <tfoot><tr><td>Total</td><td class="num">${money(t.fat)}</td><td class="num">${money(t.maoObra)}</td><td class="num">${money(t.despesas)}</td><td class="num">${money(t.gastos)}</td><td class="num">${money(t.saldo)}</td><td class="num">${money(t.aReceber)}</td></tr></tfoot>

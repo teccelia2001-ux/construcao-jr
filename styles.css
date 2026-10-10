@@ -424,3 +424,56 @@ body.sem-login .topbar, body.sem-login .tabs, body.sem-login main { visibility: 
 :root[data-tema="claro"] .seg button.active { background: var(--primary); color: #fff; }
 :root[data-tema="claro"] .val-op:has(input:checked) { background: rgba(37, 99, 235, .10); }
 :root[data-tema="claro"] .pago-card.ok { background: linear-gradient(90deg, rgba(34, 197, 94, .12), transparent 60%), #fff; }
+
+/* =====================================================
+   CELULAR (até 640px) — tudo cabe na tela, sem cortar
+   ===================================================== */
+.list-item .title, .pago-card .title { overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  /* topo mais baixo: logo menor e a cidade aparece inteira */
+  .topbar { gap: 8px; padding-left: 12px; padding-right: 12px; }
+  .logo { height: 54px; border-radius: 10px; }
+  .topbar .icon-btn { width: 36px; height: 36px; flex: 0 0 auto; }
+  .cidade-sel select { font-size: 12.5px; }
+  .top-info small { display: none; }
+
+  /* abas menores: cabem mais na tela */
+  .tabs { gap: 6px; padding-top: 8px; padding-bottom: 8px; }
+  .tabs button { min-width: 70px; padding: 6px 8px; font-size: 17px; border-radius: 12px; }
+  .tabs button span { font-size: 10.5px; }
+
+  main { padding: 12px; }
+  .section-head { margin: 16px 0 8px; }
+  .section-head h2 { font-size: 16px; }
+  .stat .value { font-size: 20px; }
+
+  /* números lado a lado em 2 colunas (em vez de um embaixo do outro) */
+  .grid-3 { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid-3 > .stat.hl, .grid-3 > .stat.larga { grid-column: 1 / -1; }
+  .grid-3 .stat { padding: 12px; }
+  .grid-3 .stat .value { font-size: 17px; overflow-wrap: anywhere; }
+
+  /* botões do cabeçalho de cada seção ocupam a largura toda */
+  .section-head > .row { width: 100%; }
+  .section-head > .row .btn:not(.sm) { flex: 1 1 auto; justify-content: center; }
+
+  /* painéis (modais) ocupam a tela toda de baixo para cima */
+  .modal { max-height: 94vh; padding: 14px 14px calc(18px + env(safe-area-inset-bottom)); }
+  .form-actions { position: sticky; bottom: calc(-18px - env(safe-area-inset-bottom)); background: var(--card); padding: 10px 0 calc(18px + env(safe-area-inset-bottom)); margin-bottom: calc(-18px - env(safe-area-inset-bottom)); z-index: 2; }
+  .form-actions .btn { flex: 1; justify-content: center; }
+
+  /* tabelas viram cartões, um por linha, com o nome de cada coluna */
+  .table-wrap:has(table.tcard) { overflow: visible; padding: 4px 12px; }
+  table.tcard { min-width: 0; }
+  table.tcard thead { display: none; }
+  table.tcard tr { display: block; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  table.tcard tbody tr:last-child { border-bottom: 0; }
+  table.tcard tfoot tr { border-top: 2px solid var(--border); border-bottom: 0; }
+  table.tcard td { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 3px 0; border: 0; text-align: right; }
+  table.tcard td::before { content: attr(data-l); color: var(--muted); font-weight: 400; font-size: 13px; text-align: left; }
+  table.tcard td:first-child { display: block; text-align: left; font-size: 15px; padding-bottom: 6px; }
+  table.tcard td:first-child::before { content: none; }
+  table.tcard td[data-l=""]:not(:first-child)::before { content: none; }
+}
+/* seletor de cidade do topo continua transparente no tema claro (o topo é sempre azul-marinho) */
+:root[data-tema="claro"] .cidade-sel select { background-color: transparent; }
