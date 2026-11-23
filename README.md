@@ -66,3 +66,7 @@ Para ativar (uma vez só):
 - **Para publicar uma versão nova:** aumente o número, sempre igual, em três lugares: `APP_VERSION` (início do `app.js`), `version.json` e os `?v=` do `index.html`. Depois envie para o GitHub.
 - O botão **Atualizar** limpa a cópia offline, baixa os arquivos novos e confere se a versão mudou. Se não mudou, tenta mais uma vez sozinho.
 - O app funciona offline com a última versão baixada.
+
+## Tutorial
+
+Em todas as abas há um botão **❓ Tutorial** no canto da tela. Ele mostra um passo a passo que ilumina cada ponto da tela e explica a lógica dos números. Para o visualizador, o tutorial de cada aba abre sozinho na primeira visita. Os passos ficam em `tutorial.js`.

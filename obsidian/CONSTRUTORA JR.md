@@ -3,8 +3,8 @@ projeto: CONSTRUTORA JR
 empresa: JR Construções
 slogan: Sua obra em boas mãos
 status: em uso
-versao: 1.13.0
-atualizado: 2026-10-10
+versao: 1.14.0
+atualizado: 2026-11-23
 link: https://teccelia2001-ux.github.io/construcao-jr/
 repositorio: https://github.com/teccelia2001-ux/construcao-jr
 branch: claude/happy-gauss-jjrtqt
@@ -19,7 +19,7 @@ tags:
 > [!info] Acesso
 > - **Link do app:** https://teccelia2001-ux.github.io/construcao-jr/
 > - **Código (GitHub):** https://github.com/teccelia2001-ux/construcao-jr
-> - **Versão atual:** `v1.13.0` (2026-10-10)
+> - **Versão atual:** `v1.14.0` (2026-11-23)
 > - **Banco de dados:** Supabase. Entrada com **e-mail e senha**.
 > - Funciona no **celular, tablet e computador**, e também **offline**.
 
@@ -109,6 +109,14 @@ Criar um app para a construtora com **uma aba para cada item**:
 - Se um orçamento validado como própria for editado, o gasto acompanha o novo valor.
 - **Desfazer validação** (no mesmo botão) ou excluir o orçamento tira o gasto de Gastos.
 
+## ❓ Tutorial
+
+- [x] Botão **❓ Tutorial** no canto da tela, em todas as abas (e no editor de orçamento).
+- [x] Cada passo **ilumina** um ponto da tela e explica o que é e **de onde vem o número**.
+- [x] Alguns passos pedem uma ação (ex.: tocar num filtro, abrir a ficha) e avançam sozinhos quando a pessoa faz.
+- [x] Para o **visualizador**, o tutorial de cada aba abre sozinho na primeira visita.
+- [x] Em **⚙️ Configurações**, o tutorial "Como o app funciona" mostra a lógica do app inteiro: faturamento − gastos = saldo, mão de obra, vales e cidades.
+
 ## 📏 Regras de negócio
 
 > [!important] Vale combustível = adiantamento de salário
@@ -174,6 +182,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 | 1.12.0 | **Tema claro e escuro** (botão 🌙/☀️ no topo) e **vale comum**, empréstimo em dinheiro sem posto, também descontado no pagamento |
 | 1.12.1 | Aba **Combustível** renomeada para **Vale**; após marcar como paga, o **Total a pagar** conta só depois da data do pagamento |
 | 1.13.0 | **Responsivo para celular:** topo mais baixo com o nome da cidade inteiro, abas menores, números 2 por linha, tabelas de Pagamentos e Todas as cidades viram cartões, botões Salvar/Cancelar sempre visíveis nos painéis; nome da cidade aparece no tema claro |
+| 1.14.0 | **Tutorial** passo a passo em todas as abas (botão **❓ Tutorial**), no mesmo modelo do sistema de programação, explicando a lógica de cada número |
 
 ## 📌 Pendências e ideias
 
@@ -190,6 +199,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 - Arquivos principais:
   - `index.html`: a página do app.
   - `app.js`: toda a lógica.
+  - `tutorial.js`: o passo a passo do botão ❓ Tutorial de cada aba.
   - `styles.css`: o visual.
   - `manifest.json`: configuração do app instalado.
   - `sw.js`: modo offline.

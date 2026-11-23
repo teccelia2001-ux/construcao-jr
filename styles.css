@@ -477,3 +477,62 @@ body.sem-login .topbar, body.sem-login .tabs, body.sem-login main { visibility: 
 }
 /* seletor de cidade do topo continua transparente no tema claro (o topo é sempre azul-marinho) */
 :root[data-tema="claro"] .cidade-sel select { background-color: transparent; }
+
+/* =====================================================
+   TUTORIAL passo a passo (botão ❓ Tutorial de cada aba)
+   ===================================================== */
+.tut-raiz { position: fixed; inset: 0; z-index: 3000; pointer-events: none; }
+.tut-raiz[hidden], .tut-raiz [hidden] { display: none !important; }
+.tut-escuro { position: absolute; inset: 0; background: rgba(2, 10, 22, .45); }
+.tut-foco {
+  position: fixed; border-radius: 12px; border: 3px solid #f59e0b;
+  box-shadow: 0 0 0 9999px rgba(2, 10, 22, .6); transition: all .25s ease; pointer-events: none;
+}
+.tut-foco.pulsa { animation: tut-pulsa 1.3s ease-in-out infinite; }
+@keyframes tut-pulsa { 0%, 100% { border-color: #f59e0b; } 50% { border-color: #fff; } }
+.tut-cartao {
+  position: fixed; pointer-events: auto; background: var(--card); color: var(--text);
+  border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .45); max-height: calc(100vh - 24px); overflow-y: auto; animation: tut-entra .2s ease;
+}
+.tut-cartao.centro { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+@keyframes tut-entra { from { opacity: 0; } to { opacity: 1; } }
+.tut-topo { display: flex; justify-content: space-between; align-items: center; }
+.tut-passo { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.tut-x { border: 0; background: none; font-size: 24px; line-height: 1; color: var(--muted); cursor: pointer; padding: 0 4px; }
+.tut-barra { height: 4px; background: var(--border); border-radius: 4px; margin: 6px 0 10px; overflow: hidden; }
+.tut-barra i { display: block; height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent)); transition: width .3s ease; }
+.tut-cartao h3 { margin: 0 0 6px; font-size: 17px; }
+.tut-corpo p { margin: 0 0 8px; font-size: 14px; line-height: 1.5; }
+.tut-dica { background: var(--primary-soft); border-radius: 10px; padding: 7px 10px; font-size: 13px !important; }
+.tut-lista { margin: 0 0 8px; padding-left: 18px; font-size: 14px; line-height: 1.5; }
+.tut-lista li { margin-bottom: 3px; }
+.tut-conta { display: grid; gap: 6px; margin: 0 0 8px; }
+.tut-conta div { display: grid; grid-template-columns: minmax(92px, 34%) 1fr; gap: 8px; font-size: 13.5px; line-height: 1.4;
+  padding: 6px 8px; border-radius: 9px; background: var(--bg); border: 1px solid var(--border); }
+.tut-conta b { color: var(--accent); }
+.tut-fluxo { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 8px; }
+.tut-fluxo span { padding: 5px 10px; border-radius: 99px; background: var(--primary-soft); border: 1px solid var(--border); font-size: 13px; font-weight: 600; }
+.tut-fluxo i { font-style: normal; color: var(--muted); font-weight: 700; }
+.tut-aviso { font-size: 13px; color: #9a3412; background: #ffedd5; border-radius: 9px; padding: 6px 9px; margin: 0 0 8px; }
+.tut-acao { margin: 0 0 8px; font-size: 13px; font-weight: 700; color: var(--warn); }
+.tut-acao.ok { color: var(--ok); }
+.tut-botoes { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; }
+.tut-botoes button { border-radius: 11px; padding: 9px 18px; font: inherit; font-weight: 600; font-size: 14px; cursor: pointer; }
+.tut-prim { background: var(--primary); color: #fff; border: 1px solid var(--primary); }
+.tut-sec { background: transparent; color: var(--text); border: 1px solid var(--border); }
+.tut-sec:disabled { opacity: .45; cursor: default; }
+.tut-botao {
+  position: fixed; right: 18px; bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 80;
+  border: 0; border-radius: 999px; background: linear-gradient(180deg, #2f6df0, var(--primary-dark)); color: #fff;
+  font: inherit; font-weight: 600; font-size: 14px; padding: 10px 18px; box-shadow: 0 8px 24px rgba(37, 99, 235, .45); cursor: pointer;
+}
+.tut-botao[hidden] { display: none; }
+body:has(#modalBg:not([hidden])) .tut-botao { display: none; }
+body:has(#view .total-bar) .tut-botao { bottom: calc(150px + env(safe-area-inset-bottom)); }
+@media (max-width: 640px) {
+  .tut-cartao { max-height: 58vh; padding: 12px 14px; }
+  .tut-cartao.centro { top: auto; transform: none; }
+  .tut-botao { right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); padding: 9px 14px; font-size: 13px; }
+  main { padding-bottom: 70px; }
+}

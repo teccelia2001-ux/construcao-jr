@@ -4,7 +4,7 @@
 // ---------- Dados ----------
 const KEY = 'construtora-jr-v1';
 // Versão do app — ao publicar mudanças, aumente aqui, no version.json e nos ?v= do index.html
-const APP_VERSION = '1.13.0';
+const APP_VERSION = '1.14.0';
 
 // ---------- Tema claro / escuro ----------
 function aplicarTema(t) {
@@ -257,6 +257,7 @@ function render() {
   if (POS[aba]) POS[aba]();
   rotularTabelas(v); alargarSozinhos(v);
   document.querySelector('#tabs button.active')?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  window.tutAoDesenhar?.(); // tutorial.js: botão ❓ Tutorial da aba
 }
 
 // No celular os números ficam 2 por linha; o destaque e o que sobraria sozinho ocupam a linha toda
