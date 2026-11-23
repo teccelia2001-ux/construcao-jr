@@ -4,9 +4,10 @@
 // ---------- Dados ----------
 const KEY = 'construtora-jr-v1';
 // Versão do app — ao publicar mudanças, aumente aqui, no version.json e nos ?v= do index.html
-const APP_VERSION = '1.16.0';
-// link público do app (é ele que o WhatsApp mostra com o card da logo)
-const LINK_APP = 'https://teccelia2001-ux.github.io/construcao-jr/';
+const APP_VERSION = '1.16.1';
+// link público do app (é ele que o WhatsApp mostra com o card da logo).
+// O ?abrir=app faz o WhatsApp buscar o card de novo, em vez da prévia antiga sem imagem guardada para o link puro.
+const LINK_APP = 'https://teccelia2001-ux.github.io/construcao-jr/?abrir=app';
 
 // ---------- Tema claro / escuro ----------
 function aplicarTema(t) {

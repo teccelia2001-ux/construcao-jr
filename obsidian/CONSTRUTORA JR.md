@@ -3,7 +3,7 @@ projeto: CONSTRUTORA JR
 empresa: JR Construções
 slogan: Sua obra em boas mãos
 status: em uso
-versao: 1.16.0
+versao: 1.16.1
 atualizado: 2026-11-23
 link: https://teccelia2001-ux.github.io/construcao-jr/
 repositorio: https://github.com/teccelia2001-ux/construcao-jr
@@ -16,14 +16,15 @@ tags:
 
 # 🏗️ CONSTRUTORA JR — App de gestão
 
-[![JR Construções — toque para abrir o app](https://teccelia2001-ux.github.io/construcao-jr/img/card.jpg)](https://teccelia2001-ux.github.io/construcao-jr/)
+[![JR Construções — toque para abrir o app](https://teccelia2001-ux.github.io/construcao-jr/img/card.jpg)](https://teccelia2001-ux.github.io/construcao-jr/?abrir=app)
 
 *Toque no card para abrir o app.*
 
 > [!info] Acesso
 > - **Link do app:** https://teccelia2001-ux.github.io/construcao-jr/
+> - **Link para enviar no WhatsApp (com o card da logo):** https://teccelia2001-ux.github.io/construcao-jr/?abrir=app
 > - **Código (GitHub):** https://github.com/teccelia2001-ux/construcao-jr
-> - **Versão atual:** `v1.16.0` (2026-11-23)
+> - **Versão atual:** `v1.16.1` (2026-11-23)
 > - **Banco de dados:** Supabase. Entrada com **e-mail e senha**.
 > - Funciona no **celular, tablet e computador**, e também **offline**.
 
@@ -203,6 +204,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 | 1.14.0 | **Tutorial** passo a passo em todas as abas (botão **❓ Tutorial**), no mesmo modelo do sistema de programação, explicando a lógica de cada número |
 | 1.15.0 | **Tutorial das ferramentas**: o botão ❓ Tutorial abre um menu com a lógica da aba e a lista de ferramentas; cada ferramenta ensina a usar, campo por campo |
 | 1.16.0 | **Card com a logo** que abre o app: aparece ao enviar o link pelo WhatsApp, em Configurações → Acesso pelo celular (com botão **Compartilhar link**) e no topo desta nota |
+| 1.16.1 | Link para compartilhar passa a ser `…/construcao-jr/?abrir=app`, para o WhatsApp mostrar o card com a logo (o link puro tinha uma prévia antiga, sem imagem) |
 
 ## 📌 Pendências e ideias
 
