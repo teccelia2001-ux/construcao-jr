@@ -69,4 +69,4 @@ Para ativar (uma vez só):
 
 ## Tutorial
 
-Em todas as abas há um botão **❓ Tutorial** no canto da tela. Ele mostra um passo a passo que ilumina cada ponto da tela e explica a lógica dos números. Para o visualizador, o tutorial de cada aba abre sozinho na primeira visita. Os passos ficam em `tutorial.js`.
+Em todas as abas há um botão **❓ Tutorial** no canto da tela. Ele mostra um passo a passo que ilumina cada ponto da tela e explica a lógica dos números. Para o visualizador, o tutorial de cada aba abre sozinho na primeira visita. O botão abre um menu com a lógica da aba e as ferramentas dela: cada ferramenta ensina a usar, campo por campo. Os passos ficam em `tutorial.js`.

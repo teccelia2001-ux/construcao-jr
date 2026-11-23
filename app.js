@@ -4,7 +4,7 @@
 // ---------- Dados ----------
 const KEY = 'construtora-jr-v1';
 // Versão do app — ao publicar mudanças, aumente aqui, no version.json e nos ?v= do index.html
-const APP_VERSION = '1.14.0';
+const APP_VERSION = '1.15.0';
 
 // ---------- Tema claro / escuro ----------
 function aplicarTema(t) {

@@ -3,7 +3,7 @@ projeto: CONSTRUTORA JR
 empresa: JR Construções
 slogan: Sua obra em boas mãos
 status: em uso
-versao: 1.14.0
+versao: 1.15.0
 atualizado: 2026-11-23
 link: https://teccelia2001-ux.github.io/construcao-jr/
 repositorio: https://github.com/teccelia2001-ux/construcao-jr
@@ -19,7 +19,7 @@ tags:
 > [!info] Acesso
 > - **Link do app:** https://teccelia2001-ux.github.io/construcao-jr/
 > - **Código (GitHub):** https://github.com/teccelia2001-ux/construcao-jr
-> - **Versão atual:** `v1.14.0` (2026-11-23)
+> - **Versão atual:** `v1.15.0` (2026-11-23)
 > - **Banco de dados:** Supabase. Entrada com **e-mail e senha**.
 > - Funciona no **celular, tablet e computador**, e também **offline**.
 
@@ -116,6 +116,20 @@ Criar um app para a construtora com **uma aba para cada item**:
 - [x] Alguns passos pedem uma ação (ex.: tocar num filtro, abrir a ficha) e avançam sozinhos quando a pessoa faz.
 - [x] Para o **visualizador**, o tutorial de cada aba abre sozinho na primeira visita.
 - [x] Em **⚙️ Configurações**, o tutorial "Como o app funciona" mostra a lógica do app inteiro: faturamento − gastos = saldo, mão de obra, vales e cidades.
+- [x] O botão abre um **menu**: "Como esta aba funciona" (a lógica) e **"Aprender a usar"** (as ferramentas da aba).
+- [x] Cada ferramenta abre o painel de verdade e mostra **campo por campo** o que preencher, até o Salvar. O tutorial só avança quando salvou mesmo.
+- [x] 36 ferramentas, por aba:
+  - **Obras:** cadastrar cliente, cadastrar obra, mudar status, lançar recebimento pela obra, editar/excluir obra, buscar e filtrar.
+  - **Faturamento:** lançar recebimento, corrigir/excluir recebimento, ver outro ano.
+  - **Vale:** cadastrar posto, emitir vale, gerar vale e lista em PDF.
+  - **Orçamentos:** cadastrar itens do catálogo, criar orçamento, validar, enviar PDF (e "preencher este orçamento" dentro do editor).
+  - **Funcionários:** cadastrar funcionário, lançar falta, desligar funcionário, ver a ficha.
+  - **Pagamentos:** calcular um pagamento, marcar como paga, gerar relatório PDF.
+  - **Gastos:** lançar despesa, corrigir/excluir despesa, ver outro período e PDF.
+  - **Empreitada:** cadastrar empreitada, receber empreitada.
+  - **Todas as cidades:** trocar a cidade, adicionar/renomear cidade, PDF do resumo.
+  - **Configurações:** criar acesso, editar/excluir acesso, dados da empresa, instalar no celular.
+- [x] O visualizador vê só as ferramentas de consulta (filtros, fichas e PDFs).
 
 ## 📏 Regras de negócio
 
@@ -183,6 +197,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 | 1.12.1 | Aba **Combustível** renomeada para **Vale**; após marcar como paga, o **Total a pagar** conta só depois da data do pagamento |
 | 1.13.0 | **Responsivo para celular:** topo mais baixo com o nome da cidade inteiro, abas menores, números 2 por linha, tabelas de Pagamentos e Todas as cidades viram cartões, botões Salvar/Cancelar sempre visíveis nos painéis; nome da cidade aparece no tema claro |
 | 1.14.0 | **Tutorial** passo a passo em todas as abas (botão **❓ Tutorial**), no mesmo modelo do sistema de programação, explicando a lógica de cada número |
+| 1.15.0 | **Tutorial das ferramentas**: o botão ❓ Tutorial abre um menu com a lógica da aba e a lista de ferramentas; cada ferramenta ensina a usar, campo por campo |
 
 ## 📌 Pendências e ideias
 

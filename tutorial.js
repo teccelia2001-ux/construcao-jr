@@ -547,6 +547,404 @@
   };
   const chaveAtual = () => (aba === 'orcamentos' && orcEdit ? 'orcEditor' : aba);
 
+  // ================================================================ FERRAMENTAS: aprender a usar
+  // Cada ferramenta abre o painel de verdade e mostra campo por campo o que preencher.
+  // ferramenta({ nome, icone, soAdmin, botao, intro, passos, salvar, salvou, depois, aberto, abrir })
+  //  - botao: o que tocar para começar (o passo espera a pessoa tocar; em "Pular", o tutorial toca sozinho);
+  //  - passos: campos e explicações (alvos dentro do painel ganham `abrir`/`aberto` da ferramenta);
+  //  - salvar: botão final (só avança quando `salvou()` confirma); depois: mensagem final.
+  const painelAberto = () => !document.getElementById('modalBg').hidden;
+  const F = n => `#modalForm [name="${n}"]`;
+  const caixa = (t, extra) => `<p>${t}</p>${extra ? dica(extra) : ''}`;
+  const campo = (nome, titulo, texto, extra) => ({ alvo: F(nome), titulo, corpo: caixa(texto, extra), opcional: true });
+  const ponto = (alvo, titulo, texto, extra) => ({ alvo, titulo, corpo: caixa(texto, extra), opcional: true });
+  const toque = (alvo, titulo, texto, extra) => ({ alvo, titulo, corpo: caixa(texto, extra), espera: { seletor: alvo } });
+  const cidadeCampo = campo('cidade', 'Cidade', 'A cidade deste registro. Já vem a cidade escolhida no 📍 do topo.');
+  const SALVAR = '#modalForm .form-actions button[type="submit"]';
+
+  function ferramenta(t) {
+    const aberto = t.aberto || painelAberto;
+    const abrir = t.abrir || t.botao;
+    const doPainel = p => p.alvo && /#modalForm|#modalBg|\[data-o=|\.orc-item|#orcBusca|addAvulso|\.total-bar/.test(p.alvo);
+    const campos = (t.passos || []).map(p => (doPainel(p) && !p.abrir && abrir ? { ...p, abrir, aberto } : p));
+    const primeiro = campos.find(p => p.alvo && p.alvo.startsWith('#modalForm [name='))?.alvo;
+    const passos = [
+      { titulo: `${t.icone} ${t.nome}`, corpo: caixa(t.intro, 'Você vai fazer de verdade, com o tutorial do lado. Pode tocar em <b>Próximo</b> ou <b>Pular</b> a qualquer momento.'), posicao: 'centro' },
+      ...(t.botao ? [toque(t.botao, t.tituloBotao || 'Comece por aqui', t.textoBotao || 'Toque no botão iluminado.')] : []),
+      ...campos,
+    ];
+    if (t.salvar !== false) {
+      const sel = t.salvar || SALVAR;
+      passos.push({
+        alvo: sel, titulo: t.tituloSalvar || 'Salvar',
+        corpo: caixa(t.textoSalvar || 'Confira os dados e toque em <b>Salvar</b>.', 'Campos com * são obrigatórios. Se faltar algum, o app avisa e não salva.'),
+        espera: { seletor: sel, quando: t.salvou || (primeiro ? () => !acharAlvo(primeiro) : () => !painelAberto()) },
+        ...(abrir ? { abrir, aberto } : {}),
+      });
+    }
+    passos.push({ titulo: 'Pronto! 🎉', corpo: `<p>${t.depois}</p>`, ferramentaFim: true });
+    return { nome: t.nome, icone: t.icone, soAdmin: t.soAdmin, passos };
+  }
+
+  const FERRAMENTAS = {
+    agenda: [
+      ferramenta({ nome: 'Cadastrar um cliente', icone: '👤', soAdmin: true, botao: '[data-act="novoCliente"]',
+        intro: 'O cliente vem antes da obra: toda obra é de um cliente.',
+        passos: [
+          campo('nome', 'Nome', 'Nome completo do cliente.', 'Ex.: Maria José da Silva.'),
+          campo('telefone', 'Telefone / WhatsApp', 'Com DDD. É ele que o botão <b>WhatsApp</b> usa para abrir a conversa.'),
+          campo('endereco', 'Endereço', 'Onde o cliente mora (opcional).'),
+          cidadeCampo,
+          campo('obs', 'Observações', 'Qualquer anotação: indicação, preferência de contato…'),
+        ],
+        depois: 'O cliente aparece na lista <b>Clientes</b>, no fim desta aba, e já pode ser escolhido numa obra ou orçamento.' }),
+      ferramenta({ nome: 'Cadastrar uma obra', icone: '🏗️', soAdmin: true, botao: '[data-act="novaObra"]',
+        intro: 'Cadastre a obra assim que fechar o contrato. O valor do contrato é o que vira o “a receber”.',
+        passos: [
+          campo('nome', 'Nome da obra', 'Um nome fácil de reconhecer.', 'Ex.: Casa da Maria — ampliação.'),
+          campo('clienteId', 'Cliente', 'Escolha o cliente. Se ele não aparece, cadastre-o antes em “+ Cliente”.'),
+          campo('endereco', 'Endereço da obra', 'Onde a obra vai ser feita.'),
+          cidadeCampo,
+          campo('inicio', 'Início', 'O dia em que a equipe começa.'),
+          campo('fim', 'Término previsto', 'O dia combinado para entregar. A barra de prazo usa essas duas datas.'),
+          campo('status', 'Status', '<b>Agendada</b> se ainda não começou, <b>Em andamento</b> se já começou.'),
+          campo('valor', 'Valor do contrato', 'O total combinado com o cliente.', 'Ex.: 25000 ou 25.000,50.'),
+          campo('obs', 'Observações', 'Combinados, materiais por conta do cliente, etc.'),
+        ],
+        depois: 'A obra entra na lista e o valor já soma em <b>Contratos ativos</b> e <b>A receber</b>.' }),
+      ferramenta({ nome: 'Mudar o status de uma obra', icone: '🔄', soAdmin: true, salvar: false,
+        intro: 'Quando a equipe começa, pausa ou termina a obra, troque o status direto na lista.',
+        passos: [
+          toque('.obra-item .mini-select', 'A caixa de status', 'Toque na caixa da obra e escolha o novo status.'),
+          ponto('.obra-item .mini-select', 'Salva sozinho', 'Não precisa de botão Salvar: o novo status já fica gravado.', 'Obra <b>Concluída</b> sai do filtro “Ativas” e do “A receber”.'),
+        ],
+        depois: 'Para ver todas as obras, inclusive as concluídas, use o filtro <b>Todas</b>.' }),
+      ferramenta({ nome: 'Lançar recebimento pela obra', icone: '💵', soAdmin: true,
+        intro: 'O jeito mais rápido de lançar um pagamento do cliente: pela ficha da obra, já fica ligado a ela.',
+        botao: '.obra-item .btn[data-act="verObra"]', tituloBotao: 'Abra a ficha', textoBotao: 'Toque em <b>Detalhes</b> na obra.',
+        aberto: () => !!document.querySelector(F('forma')),
+        abrir: () => { if (!painelAberto()) acharAlvo('.obra-item .btn[data-act="verObra"]')?.click(); acharAlvo('#modalBg [data-act="novaReceita"]')?.click(); },
+        passos: [
+          { ...toque('#modalBg [data-act="novaReceita"]', '+ Recebimento', 'Na ficha, toque em <b>+ Recebimento</b>.'), abrir: '.obra-item .btn[data-act="verObra"]', aberto: painelAberto },
+          campo('descricao', 'Descrição', 'O que é esse pagamento.', 'Ex.: 2ª parcela.'),
+          campo('data', 'Data', 'O dia em que o dinheiro entrou.'),
+          campo('valor', 'Valor', 'Quanto o cliente pagou.'),
+          campo('obraId', 'Obra', 'Já vem a obra da ficha. É isso que baixa o “a receber” dela.'),
+          campo('forma', 'Forma de pagamento', 'PIX, dinheiro, transferência…'),
+        ],
+        depois: 'O valor entrou no <b>Faturamento</b> e baixou o “a receber” da obra. Pela ficha também dá para lançar um <b>+ Gasto</b> do mesmo jeito.' }),
+      ferramenta({ nome: 'Editar ou excluir uma obra', icone: '✏️', soAdmin: true, botao: '.obra-item .btn[data-act="editObra"]',
+        intro: 'Para corrigir datas, valor ou qualquer dado da obra.', textoBotao: 'Toque em <b>Editar</b> na obra.',
+        passos: [
+          ponto('#modalForm', 'Mude o que precisar', 'Os campos são os mesmos do cadastro. Altere só o que estiver errado.'),
+          ponto('#modalForm [data-act="delObra"]', 'Excluir', 'Este botão apaga a obra. O app pergunta antes de apagar.', 'Use só para obra lançada por engano. Obra terminada fica como <b>Concluída</b>.'),
+        ],
+        depois: 'As mudanças já aparecem na lista e nos números do topo.' }),
+      ferramenta({ nome: 'Buscar e filtrar obras', icone: '🔎', salvar: false,
+        intro: 'Ache uma obra rápido, mesmo com muitas cadastradas.',
+        passos: [
+          ponto('#buscaObra', 'Buscar', 'Digite parte do nome da obra, do cliente ou do endereço. A lista filtra enquanto você digita.'),
+          toque('#view .chip', 'Filtros de status', 'Toque em um filtro. <b>Ativas</b> mostra tudo que não está concluído.'),
+        ],
+        depois: 'Para voltar a ver tudo, apague a busca e toque em <b>Todas</b>.' }),
+    ],
+
+    faturamento: [
+      ferramenta({ nome: 'Lançar um recebimento', icone: '💰', soAdmin: true, botao: '#view [data-act="novaReceita"]',
+        intro: 'Todo dinheiro que entra (de obra ou não) é lançado como recebimento.',
+        passos: [
+          campo('descricao', 'Descrição', 'O que é esse dinheiro.', 'Ex.: Entrada da obra da garagem.'),
+          campo('data', 'Data', 'O dia em que o dinheiro entrou. Ela decide em qual semana, mês e ano o valor conta.'),
+          campo('valor', 'Valor', 'Quanto entrou.'),
+          campo('obraId', 'Obra (opcional)', 'Se for pagamento de uma obra, escolha a obra: assim o “a receber” dela baixa.'),
+          cidadeCampo,
+          campo('forma', 'Forma de pagamento', 'PIX, dinheiro, transferência ou cartão.'),
+        ],
+        depois: 'O valor já soma nos totais da semana, do mês e do ano e nos gráficos.' }),
+      ferramenta({ nome: 'Corrigir ou excluir um recebimento', icone: '✏️', soAdmin: true, botao: '#view [data-act="editReceita"]',
+        intro: 'Lançou valor ou data errada? Corrija pelo Editar.', textoBotao: 'Toque em <b>Editar</b> no recebimento.',
+        passos: [
+          ponto('#modalForm', 'Corrija', 'Altere o que estiver errado.'),
+          ponto('#modalForm .btn.danger', 'Excluir', 'Apaga o recebimento. O app pergunta antes.'),
+        ],
+        depois: 'Os totais e gráficos já foram recalculados.' }),
+      ferramenta({ nome: 'Ver outro ano', icone: '📅', salvar: false,
+        intro: 'O gráfico “Por mês” e a lista de recebimentos mostram um ano de cada vez.',
+        passos: [toque('#view [data-act="fatAno"]', 'Setas do ano', 'Toque em <b>‹</b> para o ano anterior ou <b>›</b> para o seguinte.')],
+        depois: 'A lista de recebimentos no fim da aba também mudou para o ano escolhido.' }),
+    ],
+
+    combustivel: [
+      ferramenta({ nome: 'Cadastrar um posto', icone: '⛽', soAdmin: true, botao: '[data-act="novoPosto"]',
+        intro: 'Cadastre os postos conveniados antes de emitir vale de combustível.',
+        passos: [
+          campo('nome', 'Nome do posto', 'Como o posto é conhecido.'),
+          campo('endereco', 'Endereço', 'Opcional. Sai no vale em PDF.'),
+          campo('telefone', 'Telefone', 'Opcional.'),
+          cidadeCampo,
+        ],
+        depois: 'O posto aparece em <b>Postos de combustível</b> e já pode ser escolhido no vale.' }),
+      ferramenta({ nome: 'Emitir um vale', icone: '🧾', soAdmin: true, botao: '[data-act="novoVale"]',
+        intro: 'Use para combustível (em um posto) ou para dinheiro emprestado ao funcionário.',
+        passos: [
+          campo('tipo', 'Tipo de vale', '<b>⛽ Combustível</b>: abastece num posto. <b>💵 Comum</b>: empréstimo em dinheiro.'),
+          campo('funcionarioId', 'Colaborador', 'Quem recebe o vale. Só aparecem os funcionários ativos da cidade.'),
+          campo('postoId', 'Posto', 'Só no vale de combustível: onde vai abastecer.'),
+          campo('data', 'Data', 'O dia do vale. Decide em qual quinzena ele é descontado.'),
+          campo('valor', 'Valor', 'Quanto foi liberado.'),
+          campo('obs', 'Observação', 'Ex.: ida à obra do Centro.'),
+        ],
+        depois: 'O vale está na lista. Toque no <b>🧾</b> dele para gerar o vale em PDF. Ele já sai descontado em <b>Pagamentos</b>.' }),
+      ferramenta({ nome: 'Gerar vale e lista em PDF', icone: '📄', salvar: false,
+        intro: 'Imprima o vale para entregar no posto ou a lista do período para conferir.',
+        passos: [
+          ponto('#view [data-act="pdfVale"]', 'Um vale', 'O <b>🧾</b> de cada vale gera o PDF daquele vale.'),
+          toque('#view [data-act="pdfVales"]', 'A lista', 'Toque em <b>📄 PDF</b> para gerar a lista de todos os vales do período.'),
+        ],
+        depois: 'Para outro período, troque Semana / Quinzena / Mês no topo da aba.' }),
+    ],
+
+    orcamentos: [
+      ferramenta({ nome: 'Cadastrar itens do catálogo', icone: '📦', soAdmin: true,
+        intro: 'Cadastre uma vez os materiais e serviços com preço. Depois, todo orçamento já vem com eles.',
+        botao: '[data-act="verCatalogo"]', tituloBotao: 'Abra o catálogo', textoBotao: 'Toque em <b>📦 Itens cadastrados</b>.',
+        aberto: () => !!document.querySelector(F('preco')),
+        abrir: () => { if (!painelAberto()) acharAlvo('[data-act="verCatalogo"]')?.click(); acharAlvo('#modalForm [data-act="novoItemCat"]')?.click(); },
+        passos: [
+          { ...toque('#modalForm [data-act="novoItemCat"]', 'Novo item', 'Toque em <b>+ Cadastrar item</b>.'), abrir: '[data-act="verCatalogo"]', aberto: painelAberto },
+          campo('nome', 'Nome', 'Ex.: Cimento CP-II 50 kg, Reboco interno.'),
+          campo('tipo', 'Tipo', '<b>Material</b> ou <b>Serviço</b>. Eles aparecem separados no orçamento.'),
+          campo('unidade', 'Unidade', 'Como é medido: saco, m², m³, diária, unidade…'),
+          campo('preco', 'Valor unitário', 'Preço de uma unidade. Pode ser ajustado em cada orçamento.'),
+        ],
+        depois: 'O item já aparece em todos os orçamentos novos, é só colocar a quantidade.' }),
+      ferramenta({ nome: 'Criar um orçamento', icone: '🧾', soAdmin: true, botao: '[data-act="novoOrc"]',
+        intro: 'Monte o orçamento colocando só as quantidades. O app faz as contas.',
+        aberto: () => !!orcEdit,
+        passos: [
+          ponto('[data-o="clienteId"]', 'Cliente', 'Escolha o cliente. O <b>+</b> ao lado cadastra um novo sem sair daqui.'),
+          ponto('[data-o="obraId"]', 'Obra (opcional)', 'Se o orçamento é de uma obra, escolha. Aparecem só as obras do cliente.'),
+          ponto('[data-o="validade"]', 'Validade', 'Até quando o preço vale. Começa com 15 dias.'),
+          ponto('.orc-item[data-linha] [data-f="qtd"]', 'Quantidade', 'Em cada item que vai usar, digite a quantidade. O total da linha aparece na hora.', 'Deixe vazio o que não vai usar.'),
+          ponto('.orc-item[data-linha] [data-f="preco"]', 'Valor unitário', 'Já vem do catálogo. Pode mudar só para este orçamento.'),
+          ponto('#orcBusca', 'Buscar item', 'Com muitos itens, digite o nome para achar mais rápido.'),
+          ponto('[data-act="addAvulso"]', 'Item avulso', 'Para algo que não está no catálogo: descrição, unidade, quantidade e valor.'),
+          ponto('[data-o="desconto"]', 'Desconto', 'Valor em reais tirado do total.'),
+          ponto('[data-o="obs"]', 'Observações', 'Condições de pagamento e prazos. Saem no PDF.', 'Ex.: 50% na entrada e 50% na entrega.'),
+        ],
+        salvar: '[data-act="salvarOrc"]', textoSalvar: 'Toque em <b>💾 Salvar</b>. Ou em <b>Salvar e enviar PDF</b> para já mandar ao cliente.',
+        salvou: () => !orcEdit,
+        depois: 'O orçamento está na lista como <b>Pendente</b>. Quando o cliente aprovar, use <b>✔ Validar</b>.' }),
+      ferramenta({ nome: 'Validar um orçamento', icone: '✔', soAdmin: true, botao: '#view [data-act="validarOrc"]',
+        intro: 'Quando o cliente aprovar, diga quem paga o orçamento.', textoBotao: 'Toque em <b>✔ Validar</b> no orçamento.',
+        passos: [
+          ponto('#modalForm .val-opcoes', 'Quem paga?', '<b>🏗️ Própria</b>: a construtora paga e o valor entra em Gastos. <b>👤 Cliente</b>: o cliente paga, fica só aprovado.'),
+          campo('data', 'Data do gasto', 'Só na Própria: o dia em que o gasto conta.'),
+          campo('categoria', 'Categoria do gasto', 'Só na Própria: Material, Ferramentas…'),
+        ],
+        tituloSalvar: 'Validar', textoSalvar: 'Toque em <b>Validar</b>.', salvou: () => !painelAberto(),
+        depois: 'O orçamento ficou <b>Aprovado</b>. Se foi Própria, o valor já está em <b>Gastos</b>. Para desfazer, toque em <b>Validado</b> e em “Desfazer validação”.' }),
+      ferramenta({ nome: 'Enviar o PDF ao cliente', icone: '📄', salvar: false,
+        intro: 'Gere o orçamento em PDF para mandar ao cliente.',
+        passos: [toque('#view [data-act="enviarOrc"]', 'PDF', 'Toque em <b>📄 PDF</b> no orçamento. No celular, abre para enviar pelo WhatsApp.')],
+        depois: 'O PDF sai com os dados da empresa, os itens, o total e as observações.' }),
+    ],
+
+    orcEditor: [
+      ferramenta({ nome: 'Preencher este orçamento', icone: '🧾', soAdmin: true,
+        intro: 'Vamos preencher o orçamento aberto, campo por campo.',
+        passos: [
+          ponto('[data-o="clienteId"]', 'Cliente', 'Escolha o cliente. O <b>+</b> cadastra um novo.'),
+          ponto('[data-o="obraId"]', 'Obra (opcional)', 'Aparecem só as obras do cliente escolhido.'),
+          ponto('.orc-item[data-linha] [data-f="qtd"]', 'Quantidade', 'Digite a quantidade nos itens que vai usar.'),
+          ponto('[data-act="addAvulso"]', 'Item avulso', 'Para algo fora do catálogo.'),
+          ponto('[data-o="desconto"]', 'Desconto', 'Em reais, tirado do total.'),
+          ponto('.total-bar', 'Total', 'O total atualiza enquanto você digita.'),
+        ],
+        salvar: '[data-act="salvarOrc"]', textoSalvar: 'Toque em <b>💾 Salvar</b>.', salvou: () => !orcEdit,
+        depois: 'Salvo! Ele aparece na lista de orçamentos.' }),
+    ],
+
+    equipe: [
+      ferramenta({ nome: 'Cadastrar um funcionário', icone: '👷', soAdmin: true, botao: '[data-act="novoFunc"]',
+        intro: 'A diária e a data de admissão são o que o app usa para calcular o pagamento.',
+        passos: [
+          campo('nome', 'Nome completo', 'Como vai aparecer no relatório de pagamento.'),
+          campo('funcao', 'Função', 'Pedreiro, servente, eletricista…'),
+          campo('diaria', 'Valor da diária', 'Quanto ganha por dia trabalhado.', 'Ex.: 150.'),
+          campo('telefone', 'Telefone / WhatsApp', 'Opcional.'),
+          campo('cpf', 'CPF', 'Opcional.'),
+          campo('admissao', 'Data de admissão', 'O primeiro dia de trabalho. O salário só conta a partir dela.'),
+          campo('pix', 'Chave PIX', 'Para pagar.'),
+          cidadeCampo,
+        ],
+        depois: 'O funcionário aparece na lista e já entra no cálculo de <b>Pagamentos</b> e da mão de obra em <b>Gastos</b>.' }),
+      ferramenta({ nome: 'Lançar uma falta', icone: '📅', soAdmin: true, botao: '#view [data-act="lancarFalta"]',
+        intro: 'Lance as faltas para descontar do pagamento.',
+        passos: [
+          campo('funcionarioId', 'Funcionário', 'Quem faltou.'),
+          campo('data', 'Data', 'O dia da falta.'),
+          campo('ate', 'Até (vários dias)', 'Faltou mais de um dia seguido? Coloque o último dia aqui e o app lança todos.'),
+          campo('tipo', 'Tipo', '<b>Dia inteiro</b> desconta 1 diária. <b>Meio dia</b>, meia.'),
+          campo('motivo', 'Motivo', 'Falta, atestado, folga, chuva…'),
+          ponto('#modalForm label:has([name="desconta"])', 'Descontar do pagamento', 'Desmarque quando a falta não deve descontar (ex.: atestado, chuva).'),
+          campo('obs', 'Observação', 'Opcional.'),
+        ],
+        depois: 'A falta aparece em <b>Faltas do mês</b> e já desconta em <b>Pagamentos</b>.' }),
+      ferramenta({ nome: 'Desligar um funcionário', icone: '🚪', soAdmin: true, botao: '.func-item .btn[data-act="editFunc"]',
+        intro: 'Quem sai da empresa vira <b>inativo</b>: sai das contas, mas o histórico fica.', textoBotao: 'Toque em <b>Editar</b> no funcionário.',
+        passos: [ponto('#modalForm label:has([name="ativo"])', 'Funcionário ativo', 'Desmarque esta opção.', 'Para trazer de volta, é só marcar de novo.')],
+        salvou: () => !painelAberto(),
+        depois: 'Ele aparece no filtro <b>Inativos</b> e não entra mais no pagamento.' }),
+      ferramenta({ nome: 'Ver a ficha do funcionário', icone: '📋', salvar: false,
+        intro: 'Resumo do mês de cada funcionário.',
+        passos: [
+          toque('.func-item .btn[data-act="verFunc"]', 'Ficha', 'Toque em <b>Ficha</b>.'),
+          { ...ponto('#modalBg .modal', 'O resumo', 'Dias trabalhados, faltas, vales, quanto tem a receber e os pagamentos já marcados.'), abrir: '.func-item .btn[data-act="verFunc"]', posicao: 'canto' },
+        ],
+        depois: 'Feche a ficha no ✕.' }),
+    ],
+
+    funcionarios: [
+      ferramenta({ nome: 'Calcular um pagamento', icone: '🧮', salvar: false,
+        intro: 'Escolha o período e o app mostra quanto pagar a cada um.',
+        passos: [
+          toque('#view [data-act="pagTipo"]', 'Período', 'Toque em <b>1ª quinzena</b>, <b>2ª quinzena</b> ou <b>Mensal</b>.'),
+          ponto('#view [data-change="pagMes"]', 'Mês', 'Escolha o mês.'),
+          ponto('#view .check', 'Sábado', 'Marque se a equipe trabalha no sábado.'),
+          ponto('#view table', 'Resultado', 'Uma linha por funcionário. A coluna <b>A pagar</b> é o que cada um recebe.'),
+        ],
+        depois: 'O total fica no destaque azul do topo.' }),
+      ferramenta({ nome: 'Marcar como paga', icone: '✅', soAdmin: true, botao: '#view [data-act="marcarPago"]',
+        intro: 'Depois de pagar a equipe, registre no app.', textoBotao: 'Toque em <b>✔ Marcar como paga</b>.',
+        passos: [
+          ponto('#modalForm .val-opcoes', 'Quanto foi pago', 'Com o período ainda aberto: <b>Período inteiro</b> ou só <b>Até hoje</b>.'),
+          campo('data', 'Data do pagamento', 'O dia em que pagou.'),
+          campo('forma', 'Forma', 'PIX, dinheiro, transferência ou cheque.'),
+          campo('obs', 'Observação', 'Opcional.'),
+        ],
+        tituloSalvar: 'Marcar como paga', textoSalvar: 'Toque em <b>Marcar como paga</b>.', salvou: () => !painelAberto(),
+        depois: 'O cartão ficou verde com a data. Na tabela aparece a coluna <b>Pago</b>. Errou? Use <b>Desfazer</b>.' }),
+      ferramenta({ nome: 'Gerar o relatório em PDF', icone: '📄', salvar: false,
+        intro: 'Relatório com todos os funcionários do período.',
+        passos: [toque('#view [data-act="pdfFolha"]', 'Relatório PDF', 'Toque em <b>📄 Relatório PDF</b>.')],
+        depois: 'Sai com dias, faltas, bruto, vales e o valor a pagar de cada um.' }),
+    ],
+
+    gastos: [
+      ferramenta({ nome: 'Lançar uma despesa', icone: '🧾', soAdmin: true, botao: '#view [data-act="novaDespesa"]',
+        intro: 'Material, ferramenta, combustível da empresa, aluguel… Tudo que a empresa paga (menos salários, que o app calcula sozinho).',
+        passos: [
+          campo('descricao', 'Descrição', 'O que foi comprado ou pago.', 'Ex.: 20 sacos de cimento.'),
+          campo('data', 'Data', 'O dia do gasto.'),
+          campo('valor', 'Valor', 'Quanto custou.'),
+          campo('categoria', 'Categoria', 'Agrupa os gastos na composição e no gráfico.'),
+          campo('obraId', 'Obra (opcional)', 'Se foi para uma obra, escolha: o gasto aparece na ficha dela.'),
+          cidadeCampo,
+        ],
+        depois: 'A despesa entrou no total de gastos e no saldo do período.' }),
+      ferramenta({ nome: 'Corrigir ou excluir uma despesa', icone: '✏️', soAdmin: true, botao: '#view [data-act="editDespesa"]',
+        intro: 'Para corrigir valor, data ou categoria.', textoBotao: 'Toque em <b>Editar</b> na despesa.',
+        passos: [ponto('#modalForm', 'Corrija', 'Altere o que estiver errado.'), ponto('#modalForm .btn.danger', 'Excluir', 'Apaga a despesa. O app pergunta antes.')],
+        depois: 'Os totais já foram recalculados.' }),
+      ferramenta({ nome: 'Ver outro período e gerar PDF', icone: '📄', salvar: false,
+        intro: 'Veja os gastos de qualquer semana, quinzena ou mês.',
+        passos: [
+          toque('#view .card .seg button', 'Período', 'Toque em <b>Semana</b>, <b>Quinzena</b> ou <b>Mês</b>.'),
+          ponto('#view [data-change="setPeriodoData"]', 'Data de referência', 'Escolha uma data do período que quer ver.'),
+          ponto('#view [data-act="pdfGastos"]', 'PDF', 'Gera o relatório de gastos do período.'),
+        ],
+        depois: 'Tudo na aba mostra o período escolhido.' }),
+    ],
+
+    empreitadas: [
+      ferramenta({ nome: 'Cadastrar uma empreitada', icone: '🔨', soAdmin: true, botao: '[data-act="novaEmp"]',
+        intro: 'Para serviço pequeno, com valor fechado.',
+        passos: [
+          campo('servico', 'Serviço', 'O que vai ser feito.', 'Ex.: Construção de muro 10 m.'),
+          campo('cliente', 'Cliente', 'Só o nome. Não precisa de cadastro.'),
+          campo('telefone', 'Telefone', 'Opcional.'),
+          campo('endereco', 'Endereço', 'Onde é o serviço.'),
+          campo('valor', 'Valor combinado', 'O preço fechado.'),
+          campo('status', 'Status', 'Aberta, em andamento ou concluída.'),
+          campo('inicio', 'Início', 'Quando começa.'),
+          campo('prazo', 'Prazo (dias)', 'Em quantos dias termina.'),
+          campo('responsavelId', 'Responsável', 'O funcionário que vai fazer.'),
+        ],
+        depois: 'A empreitada aparece na lista com o valor em <b>A receber</b>.' }),
+      ferramenta({ nome: 'Receber uma empreitada', icone: '💵', soAdmin: true, botao: '#view [data-act="receberEmp"]',
+        intro: 'Quando o cliente pagar (tudo ou uma parte).', textoBotao: 'Toque em <b>Receber</b> na empreitada.',
+        passos: [
+          campo('data', 'Data', 'O dia em que recebeu.'),
+          campo('valor', 'Valor', 'Já vem o que falta. Mude se recebeu só uma parte.'),
+          campo('forma', 'Forma de pagamento', 'PIX, dinheiro…'),
+        ],
+        tituloSalvar: 'Registrar', textoSalvar: 'Toque em <b>Registrar</b>.', salvou: () => !painelAberto(),
+        depois: 'O valor entrou no <b>Faturamento</b>. Se completou o combinado, a empreitada ficou <b>Concluída</b>.' }),
+    ],
+
+    cidades: [
+      ferramenta({ nome: 'Trocar a cidade', icone: '📍', salvar: false,
+        intro: 'Escolha qual cidade ver em todas as abas.',
+        passos: [
+          ponto('.cidade-sel', 'O 📍 do topo', 'Toque e escolha a cidade. <b>🌎 Todas as cidades</b> soma tudo.'),
+          ponto('#view [data-act="abrirCidade"]', 'Ou pelo Abrir', 'O <b>Abrir</b> de cada cidade escolhe a cidade e vai para as obras dela.'),
+        ],
+        depois: 'A cidade escolhida fica guardada neste aparelho.' }),
+      ferramenta({ nome: 'Adicionar ou renomear cidade', icone: '➕', soAdmin: true, botao: '#view [data-act="gerenciarCidades"]',
+        intro: 'Cadastre uma cidade nova quando a empresa começar a trabalhar lá.',
+        passos: [
+          campo('nova', 'Nova cidade', 'Digite o nome da cidade.', 'Ex.: Iguatu.'),
+          ponto('#modalForm [data-act="renomearCidade"]', 'Renomear', 'Corrige o nome em todos os registros daquela cidade.', 'Excluir só funciona em cidade sem nenhum registro.'),
+        ],
+        salvar: '#modalForm button[type="submit"]', tituloSalvar: 'Adicionar', textoSalvar: 'Digite o nome e toque em <b>Adicionar</b>.',
+        salvou: () => !acharAlvo(F('nova'))?.value,
+        depois: 'A cidade nova já aparece no 📍 do topo e nos cadastros.' }),
+      ferramenta({ nome: 'Gerar o resumo em PDF', icone: '📄', salvar: false,
+        intro: 'Resumo de todas as cidades no período escolhido.',
+        passos: [toque('#view [data-act="pdfCidades"]', 'PDF', 'Toque em <b>PDF</b>.')],
+        depois: 'Sai com o total geral e os números de cada cidade.' }),
+    ],
+
+    config: [
+      ferramenta({ nome: 'Criar um acesso', icone: '🔑', soAdmin: true, botao: '[data-act="novoAcesso"]',
+        intro: 'Dê acesso ao app para outra pessoa, com e-mail e senha.',
+        passos: [
+          campo('email', 'E-mail', 'O e-mail que a pessoa vai usar para entrar.'),
+          campo('nome', 'Nome', 'Para você saber de quem é o acesso.'),
+          ponto('#modalForm .val-opcoes', 'Tipo de acesso', '<b>Administrador</b> lança e altera. <b>Visualizador</b> só consulta.'),
+          campo('senha', 'Senha', 'Mínimo 6 caracteres. Passe para a pessoa junto com o e-mail.'),
+        ],
+        depois: 'O acesso aparece na lista. Mande para a pessoa o link do app, o e-mail e a senha.' }),
+      ferramenta({ nome: 'Editar ou excluir um acesso', icone: '✏️', soAdmin: true, botao: '#acessosBox [data-act="editAcesso"]',
+        intro: 'Mude o tipo de acesso, o nome ou a senha de alguém.', textoBotao: 'Toque em <b>Editar</b> no acesso.',
+        passos: [
+          ponto('#modalForm .val-opcoes', 'Tipo de acesso', 'Troque entre Administrador e Visualizador.'),
+          campo('senha', 'Nova senha', 'Deixe em branco para manter a senha atual.'),
+        ],
+        salvou: () => !painelAberto(),
+        depois: 'Para tirar o acesso de alguém, use o <b>Excluir</b> ao lado do Editar.' }),
+      ferramenta({ nome: 'Dados da empresa', icone: '🏢', soAdmin: true, salvar: '#cfgForm button[type="submit"]', salvou: () => true,
+        intro: 'Esses dados saem no cabeçalho dos PDFs.',
+        passos: [
+          ponto('#cfgForm [name="empresa"]', 'Nome da empresa', 'Como aparece no PDF.'),
+          ponto('#cfgForm [name="cnpj"]', 'CNPJ / CPF', 'Opcional.'),
+          ponto('#cfgForm [name="telefone"]', 'Telefone', 'Para o cliente falar com a empresa.'),
+          ponto('#cfgForm [name="endereco"]', 'Endereço', 'Opcional.'),
+        ],
+        textoSalvar: 'Toque em <b>Salvar</b>.',
+        depois: 'Os próximos PDFs já saem com os dados novos.' }),
+      ferramenta({ nome: 'Instalar no celular', icone: '📲', salvar: false,
+        intro: 'Deixe o app na tela inicial, como um aplicativo.',
+        passos: [
+          ponto('#view [data-act="copiarLink"]', 'Copiar o link', 'Copia o endereço do app para mandar a alguém.'),
+          ponto('#view [data-act="instalarApp"]', 'Instalar', 'Coloca o app na tela inicial. No iPhone, o app mostra o passo a passo.'),
+        ],
+        depois: 'Depois de instalado, o app abre em tela cheia, sem a barra do navegador.' }),
+    ],
+  };
+
+
   // ---------------------------------------------------------------- Motor do passo a passo
   const visivel = e => e && (e.offsetParent !== null || getComputedStyle(e).position === 'fixed');
   function acharAlvo(alvo) {
@@ -572,27 +970,60 @@
   const lerVisto = c => { try { return !!localStorage.getItem(KEY + ':tutorial:' + c); } catch (e) { return true; } };
   const gravarVisto = c => { try { localStorage.setItem(KEY + ':tutorial:' + c, '1'); } catch (e) { /* ignora */ } };
 
-  function abrir() {
+  const ferramentasDaAba = () => (FERRAMENTAS[chaveAtual()] || []).filter(f => !f.soAdmin || ehAdmin());
+
+  // Menu do botão ❓ Tutorial: a lógica da aba + as ferramentas que a pessoa pode usar.
+  function abrirMenu() {
     const chave = chaveAtual();
     if (!POR_ABA[chave]) return;
-    tut = { chave, passos: POR_ABA[chave].filter(p => !p.soAdmin || ehAdmin()), i: 0 };
+    if (tut) parar();
+    tut = { menu: true, chave, aba, passos: [] };
+    raiz.hidden = false; botao.hidden = true;
+    foco.hidden = true; escuro.hidden = false;
+    const fs = ferramentasDaAba();
+    cartao.innerHTML = `
+      <div class="tut-topo"><span class="tut-passo">Tutorial</span><button type="button" class="tut-x" data-tut="sair" aria-label="Fechar tutorial">×</button></div>
+      <h3>O que você quer aprender?</h3>
+      <button type="button" class="tut-op tut-op-logica" data-tut="logica"><span>📘</span><span><b>Como esta aba funciona</b><small>A lógica: de onde vem cada número</small></span></button>
+      ${fs.length ? `<div class="tut-menu-tit">🛠️ Aprender a usar</div>
+      ${fs.map((f, i) => `<button type="button" class="tut-op" data-tut="ferr" data-i="${i}"><span>${f.icone}</span><span><b>${f.nome}</b></span></button>`).join('')}` : ''}
+      ${!ehAdmin() ? dica('Seu acesso é de <b>visualizador</b>: aparecem só as ferramentas de consulta.') : ''}`;
+    const cel = innerWidth <= 640;
+    Object.assign(cartao.style, cel
+      ? { width: innerWidth - 2 * MARGEM + 'px', left: MARGEM + 'px', top: '', bottom: MARGEM + 'px', transform: '' }
+      : { width: '400px', left: '', top: '', bottom: '', transform: '' });
+    cartao.classList.toggle('centro', !cel); cartao.classList.add('tut-menu');
+    cartao.scrollTop = 0;
+  }
+  function iniciar(passos, extra) {
+    if (tut) parar();
+    tut = { chave: chaveAtual(), aba, passos: passos.filter(p => !p.soAdmin || ehAdmin()), i: 0, ...extra };
+    cartao.classList.remove('tut-menu');
     raiz.hidden = false; botao.hidden = true;
     ir(0);
   }
+  function parar() { clearTimeout(tut.timer); clearInterval(tut.medidor); }
   function sair() {
     if (!tut) return;
-    gravarVisto(tut.chave);
-    clearTimeout(tut.timer); clearInterval(tut.medidor);
-    if (tut.passos.some(p => p.alvo === '#modalBg .modal')) fecharModal();
-    tut = null; raiz.hidden = true; atualizarBotao();
+    if (!tut.menu && !tut.ferramenta) gravarVisto(tut.chave);
+    parar();
+    // a ficha aberta pela lógica fecha junto; nas ferramentas o painel fica (pode ter dados digitados)
+    if (!tut.ferramenta && tut.passos.some(p => p.alvo === '#modalBg .modal')) fecharModal();
+    tut = null; raiz.hidden = true; cartao.classList.remove('tut-menu'); atualizarBotao();
   }
-  function ir(n) {
-    clearTimeout(tut.timer); clearInterval(tut.medidor);
+  const estaAberto = p => (p.aberto ? p.aberto() : painelAberto());
+  function ir(n, dir = n >= (tut.i || 0) ? 1 : -1) {
+    parar();
     tut.i = Math.max(0, Math.min(tut.passos.length - 1, n));
-    tut.feito = false; tut.rolou = false;
+    tut.feito = false; tut.rolou = false; tut.conferindo = false;
     const p = tut.passos[tut.i];
-    if (p.fechar && !document.getElementById('modalBg').hidden) fecharModal();
-    if (p.abrir && document.getElementById('modalBg').hidden) acharAlvo(p.abrir)?.click();
+    if (p.fechar && painelAberto()) fecharModal();
+    if (p.abrir && !estaAberto(p)) (typeof p.abrir === 'function' ? p.abrir() : acharAlvo(p.abrir)?.click());
+    // campo que não existe agora (ex.: cidade quando só há uma): passa direto
+    if (p.opcional && !acharAlvo(p.alvo)) {
+      const prox = tut.i + dir;
+      if (prox >= 0 && prox < tut.passos.length) return ir(prox, dir);
+    }
     desenhar();
     medir();
     tut.medidor = setInterval(medir, 250);
@@ -610,14 +1041,15 @@
       <div class="tut-botoes">
         <button type="button" class="tut-sec" data-tut="voltar" ${tut.i === 0 ? 'disabled' : ''}>Voltar</button>
         <button type="button" class="tut-prim" data-tut="${ultimo ? 'sair' : 'proximo'}">${ultimo ? 'Concluir' : p.espera && !tut.feito ? 'Pular' : 'Próximo'}</button>
-      </div>`;
+      </div>
+      ${ultimo ? `<button type="button" class="tut-mais" data-tut="menu">📋 ${tut.ferramenta ? 'Aprender outra ferramenta' : 'Aprender a usar as ferramentas desta aba'}</button>` : ''}`;
     cartao.scrollTop = 0;
   }
 
   // Ilumina o alvo e posiciona o cartão: abaixo/acima do alvo no computador; no celular, embaixo
   // (ou em cima, quando o alvo está na metade de baixo da tela).
   function medir() {
-    if (!tut) return;
+    if (!tut || tut.menu) return;
     const p = tut.passos[tut.i];
     const el = acharAlvo(p.alvo);
     cartao.querySelector('.tut-aviso').hidden = !p.alvo || !!el;
@@ -671,29 +1103,38 @@
   cartao.addEventListener('click', e => {
     const b = e.target.closest('[data-tut]');
     if (!b || !tut) return;
-    if (b.dataset.tut === 'sair') sair();
-    else if (b.dataset.tut === 'voltar') ir(tut.i - 1);
+    const acao = b.dataset.tut;
+    if (acao === 'sair') sair();
+    else if (acao === 'menu') abrirMenu();
+    else if (acao === 'logica') iniciar(POR_ABA[chaveAtual()]);
+    else if (acao === 'ferr') { const f = ferramentasDaAba()[+b.dataset.i]; iniciar(f.passos, { ferramenta: f.nome }); }
+    else if (acao === 'voltar') ir(tut.i - 1);
     else ir(tut.i + 1);
   });
-  botao.addEventListener('click', abrir);
+  botao.addEventListener('click', abrirMenu);
 
   // Passo com ação: quando a pessoa toca no ponto pedido, comemora e avança sozinho.
   document.addEventListener('click', e => {
-    if (!tut || e.target.closest('.tut-raiz')) return;
+    if (!tut || tut.menu || e.target.closest('.tut-raiz')) return;
     const p = tut.passos[tut.i];
-    if (!p.espera || tut.feito || !e.target.closest(p.espera.seletor)) return;
-    tut.feito = true; desenhar();
-    tut.timer = setTimeout(() => tut && ir(tut.i + 1), 900);
+    if (!p.espera || tut.feito || tut.conferindo || !e.target.closest(p.espera.seletor)) return;
+    const i = tut.i;
+    const ok = () => { if (!tut || tut.i !== i) return; tut.feito = true; desenhar(); tut.timer = setTimeout(() => tut && tut.i === i && ir(i + 1), 900); };
+    if (!p.espera.quando) return ok();
+    // botão Salvar: só comemora se salvou mesmo (painel fechou); se faltou campo, espera a pessoa corrigir
+    tut.conferindo = true;
+    setTimeout(() => { if (!tut || tut.i !== i) return; tut.conferindo = false; if (p.espera.quando()) ok(); }, 450);
   }, true);
 
   document.addEventListener('keydown', e => {
     if (!tut) return;
     if (e.key === 'Escape') sair();
+    else if (tut.menu) return;
     else if (e.key === 'ArrowRight') ir(tut.i + 1);
     else if (e.key === 'ArrowLeft') ir(tut.i - 1);
   });
-  addEventListener('resize', medir);
-  addEventListener('scroll', medir, true);
+  addEventListener('resize', () => tut && !tut.menu && medir());
+  addEventListener('scroll', () => tut && !tut.menu && medir(), true);
 
   // Chamado pelo app a cada tela desenhada: trocou de aba → fecha o tutorial antigo; para o
   // visualizador, o tutorial de cada aba abre sozinho na primeira visita.
@@ -703,12 +1144,13 @@
   }
   window.tutAoDesenhar = () => {
     const chave = chaveAtual();
-    if (tut && tut.chave !== chave) sair();
+    // trocou de aba: fecha (a ferramenta de orçamento continua ao abrir o editor)
+    if (tut && (tut.ferramenta ? tut.aba !== aba : tut.chave !== chave)) sair();
     atualizarBotao();
     if (chave === ultimaChave) return;
     ultimaChave = chave;
     clearTimeout(abrirAuto);
-    if (usuario && !ehAdmin() && POR_ABA[chave] && !lerVisto(chave)) abrirAuto = setTimeout(() => { if (!tut && chaveAtual() === chave) abrir(); }, 700);
+    if (usuario && !ehAdmin() && POR_ABA[chave] && !lerVisto(chave)) abrirAuto = setTimeout(() => { if (!tut && chaveAtual() === chave) iniciar(POR_ABA[chave]); }, 700);
   };
   window.tutAoDesenhar();
 })();
