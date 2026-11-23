@@ -4,7 +4,9 @@
 // ---------- Dados ----------
 const KEY = 'construtora-jr-v1';
 // Versão do app — ao publicar mudanças, aumente aqui, no version.json e nos ?v= do index.html
-const APP_VERSION = '1.15.0';
+const APP_VERSION = '1.16.0';
+// link público do app (é ele que o WhatsApp mostra com o card da logo)
+const LINK_APP = 'https://teccelia2001-ux.github.io/construcao-jr/';
 
 // ---------- Tema claro / escuro ----------
 function aplicarTema(t) {
@@ -289,7 +291,7 @@ const actions = {
 // Ações que o leitor pode usar (consultar, filtrar, gerar PDF). O resto é só do administrador.
 const ACOES_LEITOR = new Set(['goTab', 'trocarTema', 'closeModal', 'abrirCidade', 'filtroObra', 'fatAno', 'setPeriodo', 'pagTipo', 'equipeStatus',
   'verObra', 'verFunc', 'verCatalogo', 'pdfCidades', 'pdfFolha', 'pdfGastos', 'pdfVale', 'pdfVales', 'enviarOrc', 'copiarLink',
-  'instalarApp', 'fecharInstalar', 'verificarAtualizacao', 'atualizarApp', 'sair']);
+  'compartilharLink', 'instalarApp', 'fecharInstalar', 'verificarAtualizacao', 'atualizarApp', 'sair']);
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]');
   if (!el) return;
@@ -1910,7 +1912,10 @@ VIEWS.config = () => `
   <div class="card" id="acessosBox"><div class="empty">Carregando acessos…</div></div>` : ''}
   <div class="section-head"><h2>Acesso pelo celular</h2></div>
   <div class="card">
-    <div class="link-box"><input readonly value="${esc(location.href.split('#')[0].split('?')[0])}" id="linkApp"><button class="btn sec" data-act="copiarLink">Copiar</button></div>
+    <a class="card-link" href="${esc(LINK_APP)}" target="_blank" rel="noopener" title="Abrir o app"><img src="img/card.jpg" alt="JR Construções — toque para abrir o app" loading="lazy"></a>
+    <p class="muted" style="font-size:13px;margin:8px 0 10px">Ao enviar o link pelo WhatsApp, ele aparece com este card da logo. Quem tocar abre o app.</p>
+    <div class="row" style="margin-bottom:10px"><button class="btn wa" data-act="compartilharLink">📤 Compartilhar link</button></div>
+    <div class="link-box"><input readonly value="${esc(LINK_APP)}" id="linkApp"><button class="btn sec" data-act="copiarLink">Copiar</button></div>
     ${modoApp() ? '<p style="margin-bottom:0">✅ Você está usando como <b>aplicativo</b>, sem a barra do navegador.</p>'
       : `<p class="muted" style="font-size:13px">Instale na tela inicial para abrir como aplicativo, em tela cheia e sem a barra do navegador.</p>
          <button class="btn" data-act="instalarApp">📲 Instalar como aplicativo</button>`}
@@ -2000,6 +2005,11 @@ async function limparCacheApp() {
   try { sessionStorage.removeItem(KEY + ':alvo'); sessionStorage.removeItem(KEY + ':tentou'); } catch (e) { /* ignora */ }
   toast(cmpVersao(APP_VERSION, alvo || '0') >= 0 ? `App atualizado para v${APP_VERSION} ✔` : 'Não foi possível atualizar agora. Feche e abra o app de novo.');
 })();
+actions.compartilharLink = async () => {
+  const texto = `${db.config.empresa || 'JR Construções'} — Sua obra em boas mãos. Acesse o app:`;
+  if (navigator.share) { try { await navigator.share({ title: 'JR Construções', text: texto, url: LINK_APP }); return; } catch (e) { if (e.name === 'AbortError') return; } }
+  window.open(`https://wa.me/?text=${encodeURIComponent(texto + ' ' + LINK_APP)}`, '_blank', 'noopener');
+};
 actions.copiarLink = async () => {
   const v = document.getElementById('linkApp').value;
   try { await navigator.clipboard.writeText(v); toast('Link copiado'); }

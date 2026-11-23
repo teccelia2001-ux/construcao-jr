@@ -3,7 +3,7 @@ projeto: CONSTRUTORA JR
 empresa: JR Construções
 slogan: Sua obra em boas mãos
 status: em uso
-versao: 1.15.0
+versao: 1.16.0
 atualizado: 2026-11-23
 link: https://teccelia2001-ux.github.io/construcao-jr/
 repositorio: https://github.com/teccelia2001-ux/construcao-jr
@@ -16,10 +16,14 @@ tags:
 
 # 🏗️ CONSTRUTORA JR — App de gestão
 
+[![JR Construções — toque para abrir o app](https://teccelia2001-ux.github.io/construcao-jr/img/card.jpg)](https://teccelia2001-ux.github.io/construcao-jr/)
+
+*Toque no card para abrir o app.*
+
 > [!info] Acesso
 > - **Link do app:** https://teccelia2001-ux.github.io/construcao-jr/
 > - **Código (GitHub):** https://github.com/teccelia2001-ux/construcao-jr
-> - **Versão atual:** `v1.15.0` (2026-11-23)
+> - **Versão atual:** `v1.16.0` (2026-11-23)
 > - **Banco de dados:** Supabase. Entrada com **e-mail e senha**.
 > - Funciona no **celular, tablet e computador**, e também **offline**.
 
@@ -128,7 +132,7 @@ Criar um app para a construtora com **uma aba para cada item**:
   - **Gastos:** lançar despesa, corrigir/excluir despesa, ver outro período e PDF.
   - **Empreitada:** cadastrar empreitada, receber empreitada.
   - **Todas as cidades:** trocar a cidade, adicionar/renomear cidade, PDF do resumo.
-  - **Configurações:** criar acesso, editar/excluir acesso, dados da empresa, instalar no celular.
+  - **Configurações:** criar acesso, editar/excluir acesso, dados da empresa, compartilhar e instalar.
 - [x] O visualizador vê só as ferramentas de consulta (filtros, fichas e PDFs).
 
 ## 📏 Regras de negócio
@@ -198,6 +202,7 @@ Criar um app para a construtora com **uma aba para cada item**:
 | 1.13.0 | **Responsivo para celular:** topo mais baixo com o nome da cidade inteiro, abas menores, números 2 por linha, tabelas de Pagamentos e Todas as cidades viram cartões, botões Salvar/Cancelar sempre visíveis nos painéis; nome da cidade aparece no tema claro |
 | 1.14.0 | **Tutorial** passo a passo em todas as abas (botão **❓ Tutorial**), no mesmo modelo do sistema de programação, explicando a lógica de cada número |
 | 1.15.0 | **Tutorial das ferramentas**: o botão ❓ Tutorial abre um menu com a lógica da aba e a lista de ferramentas; cada ferramenta ensina a usar, campo por campo |
+| 1.16.0 | **Card com a logo** que abre o app: aparece ao enviar o link pelo WhatsApp, em Configurações → Acesso pelo celular (com botão **Compartilhar link**) e no topo desta nota |
 
 ## 📌 Pendências e ideias
 
@@ -219,7 +224,7 @@ Criar um app para a construtora com **uma aba para cada item**:
   - `manifest.json`: configuração do app instalado.
   - `sw.js`: modo offline.
   - `version.json`: número da versão publicada.
-  - `img/`: logo e ícones.
+  - `img/`: logo, ícones e `card.jpg` (o card do link).
   - `vendor/`: bibliotecas de gráficos, PDF e Supabase.
   - `supabase-config.js`: endereço do projeto e chave pública do Supabase.
   - `supabase/banco.sql`: estrutura do banco e regras de acesso.
